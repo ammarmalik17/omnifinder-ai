@@ -50,6 +50,7 @@ class SearchAgent:
         
         # Add to memory
         with self.lock:
+            self.memory.add_user_message(query)
             self.memory.add_ai_message(synthesized_answer)
         
         return {

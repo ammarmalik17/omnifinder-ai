@@ -80,6 +80,7 @@ for message in st.session_state.messages:
 if prompt := st.chat_input("Ask me anything..."):
     # Add user message to session state
     st.session_state.messages.append({"role": "user", "content": prompt})
+    # Note: The agent will handle adding messages to its internal memory
     
     with st.chat_message("user"):
         st.markdown(prompt)
