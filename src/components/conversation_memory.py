@@ -68,12 +68,30 @@ class ConversationBufferWindowMemory:
         for message in self.messages:
             content = message.content
             if isinstance(content, str):
-                total_tokens += len(self.token_encoder.encode(content))
+                try:
+                    total_tokens += len(self.token_encoder.encode(content))
+                except Exception:
+                    # Fallback if token encoding fails
+                    total_tokens += len(content)
             elif isinstance(content, list):
                 # Handle list of content (for complex message types)
                 for item in content:
                     if isinstance(item, str):
-                        total_tokens += len(self.token_encoder.encode(item))
+                        try:
+                            total_tokens += len(self.token_encoder.encode(item))
+                        except Exception:
+                            # Fallback if token encoding fails
+                            total_tokens += len(item)
+            elif content is None:
+                continue
+            else:
+                # Handle other content types
+                try:
+                    content_str = str(content)
+                    total_tokens += len(self.token_encoder.encode(content_str))
+                except Exception:
+                    # Fallback if token encoding fails
+                    total_tokens += len(str(content))
         return total_tokens
     
     def _count_tokens_for_trim(self, messages: List[BaseMessage]) -> int:
@@ -82,11 +100,29 @@ class ConversationBufferWindowMemory:
         for message in messages:
             content = message.content
             if isinstance(content, str):
-                total_tokens += len(self.token_encoder.encode(content))
+                try:
+                    total_tokens += len(self.token_encoder.encode(content))
+                except Exception:
+                    # Fallback if token encoding fails
+                    total_tokens += len(content)
             elif isinstance(content, list):
                 for item in content:
                     if isinstance(item, str):
-                        total_tokens += len(self.token_encoder.encode(item))
+                        try:
+                            total_tokens += len(self.token_encoder.encode(item))
+                        except Exception:
+                            # Fallback if token encoding fails
+                            total_tokens += len(item)
+            elif content is None:
+                continue
+            else:
+                # Handle other content types
+                try:
+                    content_str = str(content)
+                    total_tokens += len(self.token_encoder.encode(content_str))
+                except Exception:
+                    # Fallback if token encoding fails
+                    total_tokens += len(str(content))
         return total_tokens
     
     def clear(self):

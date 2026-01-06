@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 class WikipediaSearchTool(BaseTool):
     """Tool for searching Wikipedia."""
     
-    name = "wikipedia_search"
+    name = "wikipedia"
     description = "Search for information on Wikipedia. Use for general knowledge queries."
     
     def _run(self, query: str) -> str:
@@ -33,13 +33,17 @@ class WikipediaSearchTool(BaseTool):
                     })
                 except wikipedia.exceptions.DisambiguationError as e:
                     # If there's a disambiguation, pick the first option
-                    summary = wikipedia.summary(e.options[0], sentences=3)
-                    results.append({
-                        "title": e.options[0],
-                        "summary": summary,
-                        "url": wikipedia.page(e.options[0]).url
-                    })
+                    if e.options:
+                        summary = wikipedia.summary(e.options[0], sentences=3)
+                        results.append({
+                            "title": e.options[0],
+                            "summary": summary,
+                            "url": wikipedia.page(e.options[0]).url
+                        })
                 except wikipedia.exceptions.PageError:
+                    continue
+                except Exception as e:
+                    # Handle other Wikipedia errors
                     continue
             
             if not results:
@@ -62,7 +66,7 @@ class WikipediaSearchTool(BaseTool):
 class ArxivSearchTool(BaseTool):
     """Tool for searching academic papers on Arxiv."""
     
-    name = "arxiv_search"
+    name = "arxiv"
     description = "Search for academic papers on Arxiv. Use for research papers and academic queries."
     
     def _run(self, query: str) -> str:
@@ -108,7 +112,7 @@ class ArxivSearchTool(BaseTool):
 class DuckDuckGoSearchTool(BaseTool):
     """Tool for searching with DuckDuckGo."""
     
-    name = "duckduckgo_search"
+    name = "duckduckgo"
     description = "Search the web using DuckDuckGo. Use for current events and real-time information."
     
     def _run(self, query: str) -> str:

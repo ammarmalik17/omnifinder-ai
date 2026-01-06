@@ -23,6 +23,16 @@ class SearchAgent:
         all_tools = get_all_tools()
         self.tools = {tool.name: tool for tool in all_tools}
         
+        # Create a mapping from old names to new names for backward compatibility
+        self.tool_name_mapping = {
+            "wikipedia_search": "wikipedia",
+            "arxiv_search": "arxiv",
+            "duckduckgo_search": "duckduckgo",
+        }
+        
+        # Reverse mapping for forward compatibility
+        self.reverse_tool_name_mapping = {v: k for k, v in self.tool_name_mapping.items()}
+        
         # Thread lock for thread safety
         self.lock = threading.Lock()
     
@@ -111,7 +121,16 @@ class SearchAgent:
         Returns:
             Tool execution result
         """
-        tool = self.tools[tool_name]
+        # Check if the tool name exists in the current tools
+        if tool_name in self.tools:
+            tool = self.tools[tool_name]
+        # If not found, check if it's an old name that needs mapping
+        elif tool_name in self.reverse_tool_name_mapping:
+            mapped_name = self.reverse_tool_name_mapping[tool_name]
+            tool = self.tools[mapped_name]
+        else:
+            raise ValueError(f"Tool '{tool_name}' not found")
+        
         return tool._run(query)
     
     def get_conversation_history(self) -> List[BaseMessage]:

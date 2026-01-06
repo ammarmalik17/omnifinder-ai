@@ -48,6 +48,11 @@ Please synthesize these results into a comprehensive answer to the original quer
         for i, result in enumerate(search_results):
             tool_name = result.get('tool_name', 'Unknown Tool')
             content = result.get('content', '')
+            # Ensure content is a string and handle potential None values
+            if content is None:
+                content = "No content returned from tool"
+            elif not isinstance(content, str):
+                content = str(content)
             formatted_results.append(f"Source {i+1} ({tool_name}):\n{content}\n---\n")
         
         formatted_results_str = "\n".join(formatted_results)

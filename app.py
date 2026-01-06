@@ -103,11 +103,14 @@ if prompt := st.chat_input("Ask me anything..."):
                 
                 # Show search results
                 with st.expander("📊 Search Results", expanded=True):
-                    for search_result in search_results:
-                        tool_name = search_result["tool_name"]
-                        content = search_result["content"]
-                        st.write(f"**Results from {tool_name}:**")
-                        st.text_area(f"{tool_name} results", content, height=200)
+                    if search_results:
+                        for search_result in search_results:
+                            tool_name = search_result.get("tool_name", "Unknown Tool")
+                            content = search_result.get("content", "No content returned")
+                            st.write(f"**Results from {tool_name}:**")
+                            st.text_area(f"{tool_name} results", content, height=200)
+                    else:
+                        st.write("No search results returned.")
                 
                 # Show synthesized answer
                 with st.expander("✨ Synthesized Answer", expanded=True):

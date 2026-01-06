@@ -43,6 +43,8 @@ Consider these indicators:
 - Technical: how to, tutorial, documentation, technical, guide, implementation, code, development
 - General knowledge: what is, who is, explain, describe, definition, meaning, history
 
+Available tools: wikipedia, arxiv, duckduckgo, web_search
+
 Respond with the appropriate tool classification and reasoning."""),
             ("human", "{query}")
         ])
