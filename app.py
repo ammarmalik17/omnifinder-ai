@@ -41,7 +41,7 @@ if "agent" not in st.session_state:
         st.stop()
     
     llm = ChatGroq(
-        model="llama3-70b-8192",
+        model="llama-3.1-8b-instant",
         temperature=0.1,
         groq_api_key=groq_api_key
     )
