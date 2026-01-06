@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from src.agents.search_agent import SearchAgent
+from src.config.agent_config import AgentConfig
 
 # Load environment variables
 load_dotenv()
@@ -23,7 +24,12 @@ def test_agent():
         groq_api_key=groq_api_key
     )
     
-    agent = SearchAgent(llm)
+    # Create agent with specific configuration for testing
+    agent_config = AgentConfig(
+        use_react_for_complex=True,
+        max_workers=4
+    )
+    agent = SearchAgent(llm, config=agent_config)
     
     print("🔍 OmniFinder AI - Test Suite")
     print("="*50)
@@ -35,11 +41,17 @@ def test_agent():
     
     try:
         result = agent.process_query("What are the latest developments in transformer-based language models?")
-        classification = result["classification"]
-        print(f"✅ Primary Tool: {classification.primary_tool}")
-        if classification.secondary_tools:
-            print(f"✅ Secondary Tools: {', '.join(classification.secondary_tools)}")
-        print(f"✅ Reasoning: {classification.reasoning}")
+        # Check if ReAct was used
+        if "react_steps" in result:
+            print("✅ Query processed with ReAct pattern")
+            print(f"✅ Synthesized Answer Length: {len(result['synthesized_answer'])} characters")
+            print(f"✅ ReAct Iterations: {result.get('react_iterations', 'N/A')}")
+        else:
+            classification = result["classification"]
+            print(f"✅ Primary Tool: {classification.primary_tool}")
+            if classification.secondary_tools:
+                print(f"✅ Secondary Tools: {', '.join(classification.secondary_tools)}")
+            print(f"✅ Reasoning: {classification.reasoning}")
         print(f"✅ Synthesized Answer Length: {len(result['synthesized_answer'])} characters")
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -51,11 +63,17 @@ def test_agent():
     
     try:
         result = agent.process_query("What happened with the latest AI regulation announcements?")
-        classification = result["classification"]
-        print(f"✅ Primary Tool: {classification.primary_tool}")
-        if classification.secondary_tools:
-            print(f"✅ Secondary Tools: {', '.join(classification.secondary_tools)}")
-        print(f"✅ Reasoning: {classification.reasoning}")
+        # Check if ReAct was used
+        if "react_steps" in result:
+            print("✅ Query processed with ReAct pattern")
+            print(f"✅ Synthesized Answer Length: {len(result['synthesized_answer'])} characters")
+            print(f"✅ ReAct Iterations: {result.get('react_iterations', 'N/A')}")
+        else:
+            classification = result["classification"]
+            print(f"✅ Primary Tool: {classification.primary_tool}")
+            if classification.secondary_tools:
+                print(f"✅ Secondary Tools: {', '.join(classification.secondary_tools)}")
+            print(f"✅ Reasoning: {classification.reasoning}")
         print(f"✅ Synthesized Answer Length: {len(result['synthesized_answer'])} characters")
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -67,11 +85,17 @@ def test_agent():
     
     try:
         result = agent.process_query("What is photosynthesis and how does it work?")
-        classification = result["classification"]
-        print(f"✅ Primary Tool: {classification.primary_tool}")
-        if classification.secondary_tools:
-            print(f"✅ Secondary Tools: {', '.join(classification.secondary_tools)}")
-        print(f"✅ Reasoning: {classification.reasoning}")
+        # Check if ReAct was used
+        if "react_steps" in result:
+            print("✅ Query processed with ReAct pattern")
+            print(f"✅ Synthesized Answer Length: {len(result['synthesized_answer'])} characters")
+            print(f"✅ ReAct Iterations: {result.get('react_iterations', 'N/A')}")
+        else:
+            classification = result["classification"]
+            print(f"✅ Primary Tool: {classification.primary_tool}")
+            if classification.secondary_tools:
+                print(f"✅ Secondary Tools: {', '.join(classification.secondary_tools)}")
+            print(f"✅ Reasoning: {classification.reasoning}")
         print(f"✅ Synthesized Answer Length: {len(result['synthesized_answer'])} characters")
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -83,11 +107,17 @@ def test_agent():
     
     try:
         result = agent.process_query("How to implement JWT authentication in a Python web application?")
-        classification = result["classification"]
-        print(f"✅ Primary Tool: {classification.primary_tool}")
-        if classification.secondary_tools:
-            print(f"✅ Secondary Tools: {', '.join(classification.secondary_tools)}")
-        print(f"✅ Reasoning: {classification.reasoning}")
+        # Check if ReAct was used
+        if "react_steps" in result:
+            print("✅ Query processed with ReAct pattern")
+            print(f"✅ Synthesized Answer Length: {len(result['synthesized_answer'])} characters")
+            print(f"✅ ReAct Iterations: {result.get('react_iterations', 'N/A')}")
+        else:
+            classification = result["classification"]
+            print(f"✅ Primary Tool: {classification.primary_tool}")
+            if classification.secondary_tools:
+                print(f"✅ Secondary Tools: {', '.join(classification.secondary_tools)}")
+            print(f"✅ Reasoning: {classification.reasoning}")
         print(f"✅ Synthesized Answer Length: {len(result['synthesized_answer'])} characters")
     except Exception as e:
         print(f"❌ Error: {e}")

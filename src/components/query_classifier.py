@@ -1,6 +1,5 @@
 from typing import Literal
 from pydantic import BaseModel, Field
-from langchain_core.tools import BaseTool
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 

@@ -1,11 +1,8 @@
-from typing import List, Dict, Any
 from langchain_core.tools import BaseTool
-from langchain_groq import ChatGroq
 import wikipedia
 import arxiv
 from duckduckgo_search import DDGS
-import requests
-from pydantic import BaseModel, Field
+from src.config.agent_config import AgentConfig
 
 
 class WikipediaSearchTool(BaseTool):
@@ -16,8 +13,11 @@ class WikipediaSearchTool(BaseTool):
     
     def _run(self, query: str) -> str:
         try:
+            # Use default config values if no config is passed
+            config = getattr(self, 'config', AgentConfig())
+            
             # Search for pages
-            search_results = wikipedia.search(query, results=5)
+            search_results = wikipedia.search(query, results=config.wikipedia_results)
             if not search_results:
                 return f"No Wikipedia pages found for '{query}'"
             
@@ -43,8 +43,7 @@ class WikipediaSearchTool(BaseTool):
                 except wikipedia.exceptions.PageError:
                     continue
                 except Exception as e:
-                    # Handle other Wikipedia errors
-                    continue
+                    return f"Error searching Wikipedia: {str(e)}"
             
             if not results:
                 return f"No detailed Wikipedia pages found for '{query}'"
@@ -71,10 +70,13 @@ class ArxivSearchTool(BaseTool):
     
     def _run(self, query: str) -> str:
         try:
+            # Use default config values if no config is passed
+            config = getattr(self, 'config', AgentConfig())
+            
             # Search for papers
             search = arxiv.Search(
                 query=query,
-                max_results=5,
+                max_results=config.arxiv_max_results,
                 sort_by=arxiv.SortCriterion.Relevance
             )
             
@@ -117,8 +119,11 @@ class DuckDuckGoSearchTool(BaseTool):
     
     def _run(self, query: str) -> str:
         try:
+            # Use default config values if no config is passed
+            config = getattr(self, 'config', AgentConfig())
+            
             with DDGS() as ddgs:
-                results = list(ddgs.text(query, max_results=5))
+                results = list(ddgs.text(query, max_results=config.duckduckgo_max_results))
             
             if not results:
                 return f"No results found for '{query}' on DuckDuckGo"
@@ -147,8 +152,11 @@ class WebSearchTool(BaseTool):
         # For this implementation, we'll use DuckDuckGo as the web search provider
         # In a production environment, you might use Google Custom Search, SerpAPI, etc.
         try:
+            # Use default config values if no config is passed
+            config = getattr(self, 'config', AgentConfig())
+            
             with DDGS() as ddgs:
-                results = list(ddgs.text(query, max_results=7))
+                results = list(ddgs.text(query, max_results=config.web_search_max_results))
             
             if not results:
                 return f"No results found for '{query}'"

@@ -1,9 +1,8 @@
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
-from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import trim_messages
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from typing import List, Optional
+from typing import List
 import tiktoken
 
 
