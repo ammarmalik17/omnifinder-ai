@@ -1,4 +1,5 @@
 from langchain_core.tools import BaseTool
+from pydantic import BaseModel, Field
 import wikipedia
 import arxiv
 from duckduckgo_search import DDGS
@@ -8,8 +9,8 @@ from src.config.agent_config import AgentConfig
 class WikipediaSearchTool(BaseTool):
     """Tool for searching Wikipedia."""
     
-    name = "wikipedia"
-    description = "Search for information on Wikipedia. Use for general knowledge queries."
+    name: str = "wikipedia"
+    description: str = "Search for information on Wikipedia. Use for general knowledge queries."
     
     def _run(self, query: str) -> str:
         try:
@@ -65,8 +66,8 @@ class WikipediaSearchTool(BaseTool):
 class ArxivSearchTool(BaseTool):
     """Tool for searching academic papers on Arxiv."""
     
-    name = "arxiv"
-    description = "Search for academic papers on Arxiv. Use for research papers and academic queries."
+    name: str = "arxiv"
+    description: str = "Search for academic papers on Arxiv. Use for research papers and academic queries."
     
     def _run(self, query: str) -> str:
         try:
@@ -114,8 +115,8 @@ class ArxivSearchTool(BaseTool):
 class DuckDuckGoSearchTool(BaseTool):
     """Tool for searching with DuckDuckGo."""
     
-    name = "duckduckgo"
-    description = "Search the web using DuckDuckGo. Use for current events and real-time information."
+    name: str = "duckduckgo"
+    description: str = "Search the web using DuckDuckGo. Use for current events and real-time information."
     
     def _run(self, query: str) -> str:
         try:
@@ -145,8 +146,8 @@ class DuckDuckGoSearchTool(BaseTool):
 class WebSearchTool(BaseTool):
     """Tool for general web search using a search API."""
     
-    name = "web_search"
-    description = "General web search for comprehensive information across multiple domains."
+    name: str = "web_search"
+    description: str = "General web search for comprehensive information across multiple domains."
     
     def _run(self, query: str) -> str:
         # For this implementation, we'll use DuckDuckGo as the web search provider
