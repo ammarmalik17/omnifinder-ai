@@ -4,7 +4,7 @@ Configuration module for OmniFinder AI agents.
 This module defines configuration classes and settings for the search agent system,
 following industry best practices for maintainability and scalability.
 """
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 from dataclasses import dataclass, field
 from enum import Enum
 

@@ -4,13 +4,11 @@ ReAct (Reasoning and Acting) Agent Implementation for OmniFinder AI.
 This module implements the ReAct pattern for search agents, which alternates between
 reasoning about the problem and taking actions with tools to solve complex queries.
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from langchain_core.tools import BaseTool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_groq import ChatGroq
-import json
 
 
 class ReActSearchAgent:

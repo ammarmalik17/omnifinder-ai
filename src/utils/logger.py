@@ -6,7 +6,6 @@ following industry best practices for maintainability and debugging.
 """
 import logging
 import sys
-from typing import Any
 from functools import wraps
 import time
 
