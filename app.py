@@ -2,7 +2,7 @@ import streamlit as st
 from dotenv import load_dotenv
 import os
 from langchain_groq import ChatGroq
-import requests
+from groq import Groq as GroqClient
 
 
 from src.agents.search_agent import SearchAgent
@@ -65,31 +65,29 @@ with st.sidebar:
     
     @st.cache_data(show_spinner=False)
     def get_groq_models(api_key):
-        """Fetch available models from Groq API."""
+        """Fetch available models from Groq API using the official client."""
         try:
-            headers = {
-                "Authorization": f"Bearer {api_key}"
-            }
-            response = requests.get("https://api.groq.com/openai/v1/models", headers=headers)
+            # Initialize the official Groq client
+            client = GroqClient(api_key=api_key)
             
-            if response.status_code == 200:
-                models_data = response.json()
-                # Extract model IDs from the response
-                models = [model["id"] for model in models_data.get("data", [])]
-                # Sort models alphabetically for better UX
-                return sorted(models)
-            else:
-                # Return default models if API call fails
-                return ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
+            # Fetch the list of available models
+            models_list = client.models.list()
+            
+            # Extract model IDs from the response
+            models = [model.id for model in models_list.data]
+            # Sort models alphabetically for better UX
+            return sorted(models)
         except Exception as e:
             # Return default models if any exception occurs
+            st.error(f"Error fetching models: {str(e)}")
             return ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
+    
+    # Initialize with default models
+    available_models = ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
     
     # Get models based on the API key provided
     if groq_api_key:
         available_models = get_groq_models(groq_api_key)
-    else:
-        available_models = ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
     
     model_option = st.selectbox(
         "Select LLM Model",
