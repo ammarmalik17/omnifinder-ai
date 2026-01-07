@@ -2,6 +2,7 @@ import streamlit as st
 from dotenv import load_dotenv
 import os
 from langchain_groq import ChatGroq
+import requests
 
 
 from src.agents.search_agent import SearchAgent
@@ -62,9 +63,37 @@ with st.sidebar:
     if groq_api_key:
         os.environ["GROQ_API_KEY"] = groq_api_key
     
+    @st.cache_data(show_spinner=False)
+    def get_groq_models(api_key):
+        """Fetch available models from Groq API."""
+        try:
+            headers = {
+                "Authorization": f"Bearer {api_key}"
+            }
+            response = requests.get("https://api.groq.com/openai/v1/models", headers=headers)
+            
+            if response.status_code == 200:
+                models_data = response.json()
+                # Extract model IDs from the response
+                models = [model["id"] for model in models_data.get("data", [])]
+                # Sort models alphabetically for better UX
+                return sorted(models)
+            else:
+                # Return default models if API call fails
+                return ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
+        except Exception as e:
+            # Return default models if any exception occurs
+            return ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
+    
+    # Get models based on the API key provided
+    if groq_api_key:
+        available_models = get_groq_models(groq_api_key)
+    else:
+        available_models = ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
+    
     model_option = st.selectbox(
         "Select LLM Model",
-        ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"],
+        available_models,
         index=0
     )
     

@@ -1,5 +1,4 @@
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel, Field
 import wikipedia
 import arxiv
 from duckduckgo_search import DDGS
