@@ -1,12 +1,12 @@
 from typing import List, Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_groq import ChatGroq
+from langchain_openrouter import ChatOpenRouter
 
 
 class ResultSynthesizer:
     """Component to synthesize results from multiple search tools into a coherent answer."""
     
-    def __init__(self, llm: ChatGroq):
+    def __init__(self, llm: ChatOpenRouter):
         self.llm = llm
         self.synthesis_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are an expert research synthesizer. Your task is to combine information from multiple sources into a coherent, well-structured answer. 

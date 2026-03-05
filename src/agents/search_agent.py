@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from langchain_groq import ChatGroq
+from langchain_openrouter import ChatOpenRouter
 from src.components.query_classifier import QueryClassifier
 from src.tools.search_tools import get_all_tools
 from src.components.result_synthesizer import ResultSynthesizer
@@ -15,7 +15,7 @@ import threading
 class SearchAgent:
     """Main search agent that integrates all components."""
     
-    def __init__(self, llm: ChatGroq, config: AgentConfig = None):
+    def __init__(self, llm: ChatOpenRouter, config: AgentConfig = None):
         self.config = config or AgentConfig()
         self.llm = llm
         self.max_workers = self.config.max_workers

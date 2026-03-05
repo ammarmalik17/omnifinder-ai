@@ -21,8 +21,8 @@ class SearchToolType(Enum):
 class AgentConfig:
     """Configuration for the SearchAgent."""
     
-    # Core settings
-    model_name: str = "llama3-70b-8192"
+# Core settings
+    model_name: str = "openai/gpt-5-nano"
     temperature: float = 0.1
     max_workers: int = 4
     use_react_for_complex: bool = True

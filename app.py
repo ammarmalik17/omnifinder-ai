@@ -1,10 +1,8 @@
 import streamlit as st
 from dotenv import load_dotenv
 import os
-from langchain_groq import ChatGroq
-from groq import Groq as GroqClient
-
-
+from langchain_openrouter import ChatOpenRouter
+from openai import OpenAI
 from src.agents.search_agent import SearchAgent
 from src.config.agent_config import AgentConfig
 
@@ -31,20 +29,53 @@ This search agent intelligently routes your queries to the most appropriate sear
 # Define default values for configuration
 max_history = 10  # Default value that matches the slider's default
 
+
+@st.cache_data(show_spinner=False)
+def get_openrouter_models(api_key):
+    """Fetch available free models from OpenRouter API.
+    
+    Uses OpenAI SDK with OpenRouter base_url for industry-standard model listing.
+    Filters to show only free models (those with :free suffix).
+    Returns sorted list of model IDs or defaults on error.
+    """
+    try:
+        # Initialize OpenAI client configured for OpenRouter
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
+        
+        # Fetch all available models using standard OpenAI SDK method
+        models_response = client.models.list()
+        
+        # Filter to only free models (those with :free suffix)
+        free_models = [
+            model.id for model in models_response.data 
+            if model.id.endswith(':free')
+        ]
+        
+        # Sort alphabetically for better UX
+        return sorted(free_models)
+        
+    except Exception as e:
+        # Log error and return default fallback model
+        st.error(f"Error fetching models: {str(e)}")
+        return ["arcee-ai/trinity-large-preview:free"]
+
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "agent" not in st.session_state:
     # Initialize LLM and agent
-    groq_api_key = os.getenv("GROQ_API_KEY")
-    if not groq_api_key:
-        st.error("Please set your GROQ_API_KEY in the .env file")
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    if not openrouter_api_key:
+        st.error("Please set your OPENROUTER_API_KEY in the .env file")
         st.stop()
-    
-    llm = ChatGroq(
-        model="llama-3.1-8b-instant",
-        temperature=0.1,
-        groq_api_key=groq_api_key
+        
+    llm = ChatOpenRouter(
+        model="arcee-ai/trinity-large-preview:free",
+        temperature=0,
+        api_key=openrouter_api_key,
     )
     # Create agent configuration based on default settings
     agent_config = AgentConfig(
@@ -58,41 +89,14 @@ if "agent" not in st.session_state:
 # Sidebar for configuration
 with st.sidebar:
     st.header("Configuration")
-    groq_api_key = st.text_input("Enter your Groq API Key:", type="password")
     
-    if groq_api_key:
-        os.environ["GROQ_API_KEY"] = groq_api_key
-    
-    @st.cache_data(show_spinner=False)
-    def get_groq_models(api_key):
-        """Fetch available models from Groq API using the official client."""
-        try:
-            # Initialize the official Groq client
-            client = GroqClient(api_key=api_key)
-            
-            # Fetch the list of available models
-            models_list = client.models.list()
-            
-            # Extract model IDs from the response
-            models = [model.id for model in models_list.data]
-            # Sort models alphabetically for better UX
-            return sorted(models)
-        except Exception as e:
-            # Return default models if any exception occurs
-            st.error(f"Error fetching models: {str(e)}")
-            return ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
-    
-    # Initialize with default models
-    available_models = ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
-    
-    # Get models based on the API key provided
-    if groq_api_key:
-        available_models = get_groq_models(groq_api_key)
-    
+    # Get models based on the API key from environment
+    available_models = get_openrouter_models(os.getenv("OPENROUTER_API_KEY", ""))
+
     model_option = st.selectbox(
         "Select LLM Model",
         available_models,
-        index=0
+        index=0 if available_models else None
     )
     
     max_history = st.slider("Max History Messages", 5, 20, 10)
@@ -122,9 +126,16 @@ if prompt := st.chat_input("Ask me anything..."):
     with st.chat_message("assistant"):
         # Process the query using the integrated agent
         with st.spinner("Processing your query..."):
+            print("\n" + "="*60)
+            print(f"User Query: {prompt}")
+            print("="*60)
+            
             try:
                 result = agent.process_query(prompt)
                 synthesized_answer = result["synthesized_answer"]
+                
+                print("\n✓ Query processed successfully")
+                print(f"Synthesized answer length: {len(synthesized_answer)} characters")
                 
                 # Check if ReAct was used (indicated by presence of react_steps)
                 if "react_steps" in result:
@@ -177,6 +188,11 @@ if prompt := st.chat_input("Ask me anything..."):
                 st.session_state.messages.append({"role": "assistant", "content": synthesized_answer})
                 
             except Exception as e:
+                print("\n❌ ERROR processing query:")
+                print(f"Error type: {type(e).__name__}")
+                print(f"Error message: {str(e)}")
+                import traceback
+                print(f"\nFull traceback:\n{traceback.format_exc()}")
                 st.error(f"Error processing query: {str(e)}")
                 error_message = "I encountered an error while processing your query. Please try again."
                 st.session_state.messages.append({"role": "assistant", "content": error_message})
