@@ -22,7 +22,6 @@ st.markdown("""
 This search agent intelligently routes your queries to the most appropriate search tools based on the query type:
 - **Wikipedia**: General knowledge queries
 - **ArXiv**: Academic papers and research
-- **DuckDuckGo**: Current events and real-time information
 - **Web Search**: Comprehensive multi-domain results
 """)
 
@@ -125,7 +124,7 @@ with col2:
     use_arxiv = st.toggle("📄 ArXiv", value=True, help="Search academic papers on ArXiv")
     
 with col3:
-    use_duckduckgo = st.toggle("🌐 DuckDuckGo", value=True, help="Search web for current events and news")
+    use_web_search = st.toggle("🌐 Web Search", value=True, help="Search web for current events and general queries")
     
 with col4:
     use_react = st.toggle("🧠 ReAct Mode", value=True, help="Enable advanced reasoning for complex queries")
@@ -136,10 +135,8 @@ if use_wikipedia:
     st.session_state.enabled_tools.append("wikipedia")
 if use_arxiv:
     st.session_state.enabled_tools.append("arxiv")
-if use_duckduckgo:
-    st.session_state.enabled_tools.append("duckduckgo")
-# web_search is always available as fallback
-st.session_state.enabled_tools.append("web_search")
+if use_web_search:
+    st.session_state.enabled_tools.append("web_search")
 
 st.session_state.use_react_mode = use_react
 

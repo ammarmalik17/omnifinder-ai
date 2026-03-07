@@ -1,7 +1,7 @@
 from langchain_core.tools import BaseTool
 import wikipedia
 import arxiv
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from src.config.agent_config import AgentConfig
 
 
@@ -111,46 +111,13 @@ class ArxivSearchTool(BaseTool):
             return f"Error searching arXiv: {str(e)}"
 
 
-class DuckDuckGoSearchTool(BaseTool):
-    """Tool for searching with DuckDuckGo."""
-    
-    name: str = "duckduckgo"
-    description: str = "Search the web using DuckDuckGo. Use for current events and real-time information."
-    
-    def _run(self, query: str) -> str:
-        try:
-            # Use default config values if no config is passed
-            config = getattr(self, 'config', AgentConfig())
-            
-            with DDGS() as ddgs:
-                results = list(ddgs.text(query, max_results=config.duckduckgo_max_results))
-            
-            if not results:
-                return f"No results found for '{query}' on DuckDuckGo"
-            
-            # Format results
-            formatted_results = []
-            for result in results:
-                formatted_results.append(
-                    f"Title: {result['title']}\n"
-                    f"Body: {result['body']}\n"
-                    f"URL: {result['href']}\n"
-                )
-            
-            return "\n".join(formatted_results)
-        except Exception as e:
-            return f"Error searching DuckDuckGo: {str(e)}"
-
-
 class WebSearchTool(BaseTool):
-    """Tool for general web search using a search API."""
+    """Tool for searching the web using DuckDuckGo."""
     
     name: str = "web_search"
-    description: str = "General web search for comprehensive information across multiple domains."
+    description: str = "Search the web using DuckDuckGo. Use for current events, real-time information, and general web queries."
     
     def _run(self, query: str) -> str:
-        # For this implementation, we'll use DuckDuckGo as the web search provider
-        # In a production environment, you might use Google Custom Search, SerpAPI, etc.
         try:
             # Use default config values if no config is passed
             config = getattr(self, 'config', AgentConfig())
@@ -180,6 +147,5 @@ def get_all_tools():
     return [
         WikipediaSearchTool(),
         ArxivSearchTool(),
-        DuckDuckGoSearchTool(),
         WebSearchTool()
     ]
