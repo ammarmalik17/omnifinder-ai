@@ -3,3 +3,4 @@ venv/
 .qoder/
 __pycache__/
 .vscode/
+ARCHITECTURE.md

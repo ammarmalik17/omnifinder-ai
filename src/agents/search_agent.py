@@ -10,6 +10,7 @@ from src.utils.logger import AgentLogger
 from langchain_core.messages import BaseMessage
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from src.components.conversational_handler import ConversationalHandler
 
 
 class SearchAgent:
@@ -30,6 +31,9 @@ class SearchAgent:
             max_history_messages=self.config.max_history_messages
         )
         
+        # Initialize conversational handler
+        self.conversational_handler = ConversationalHandler(llm)
+        
         # Initialize tools
         all_tools = get_all_tools()
         self.tools = {tool.name: tool for tool in all_tools}
@@ -38,7 +42,7 @@ class SearchAgent:
         self.tool_name_mapping = {
             "wikipedia_search": "wikipedia",
             "arxiv_search": "arxiv",
-            "duckduckgo_search": "duckduckgo",
+            "duckduckgo_search": "web_search",
         }
         
         # Reverse mapping for forward compatibility
@@ -57,7 +61,13 @@ class SearchAgent:
         use_react: bool = None
     ) -> Dict[str, Any]:
         """
-        Process a user query through the full pipeline.
+        Process a user query through the full pipeline with intent detection.
+        
+        Follows industry-standard flowchart:
+        1. Intent Detection → Conversational vs Search
+        2. For Conversational: Direct response (NO SEARCH)
+        3. For Search: Route to appropriate tools
+        4. Apply guardrails (confidence checking, clarification)
         
         Args:
             query: The user's query string
@@ -67,21 +77,107 @@ class SearchAgent:
         Returns:
             Dictionary containing classification, search results, and synthesized answer
         """
-        # Determine if we should use ReAct
-        should_use_react = use_react if use_react is not None else self.use_react_for_complex
-        
-        self.logger.log_query_processing(query, "react" if should_use_react else "traditional")
-        
-        # Classify the query to determine which tools to use
+        # STEP 1: Intent Detection
         classification = self.query_classifier.classify(query)
         
-        # For complex queries that might benefit from ReAct reasoning, use the ReAct agent
+        self.logger.log_query_processing(
+            query, 
+            "conversational" if classification.intent_type == "conversational" else ("react" if self.use_react_for_complex else "traditional")
+        )
+        
+        # STEP 2: Handle Conversational Intents (NO SEARCH)
+        if classification.intent_type == "conversational":
+            return self._handle_conversational_intent(query, classification)
+        
+        # STEP 3: Check for Low Confidence / Need Clarification
+        if classification.needs_clarification or classification.confidence < 0.5:
+            return self._handle_low_confidence(query, classification)
+        
+        # STEP 4: Determine if we should use ReAct for complex queries
+        should_use_react = use_react if use_react is not None else self.use_react_for_complex
+        
         if should_use_react and self._is_complex_query(query, classification):
             self.logger.info(f"Using ReAct pattern for complex query: {query[:50]}...")
             return self._process_with_react(query)
         
+        # STEP 5: Traditional search routing
+        return self._process_search_query(query, classification, enabled_tools)
+    
+    def _handle_conversational_intent(self, query: str, classification) -> Dict[str, Any]:
+        """Handle conversational intents without search.
+        
+        Args:
+            query: User's query
+            classification: Classification result with conversational intent
+            
+        Returns:
+            Dictionary with conversational response
+        """
+        # Use handler to generate appropriate response
+        response_data = self.conversational_handler.handle(
+            classification.conversational_intent,
+            query
+        )
+        
+        # Add to memory
+        with self.lock:
+            self.memory.add_user_message(query)
+            self.memory.add_ai_message(response_data["response"])
+        
+        return {
+            "query": query,
+            "classification": classification,
+            "search_results": [],
+            "synthesized_answer": response_data["response"],
+            "conversational": True,
+            "intent_handled": classification.conversational_intent
+        }
+    
+    def _handle_low_confidence(self, query: str, classification) -> Dict[str, Any]:
+        """Handle low confidence queries by asking for clarification.
+        
+        Args:
+            query: User's query
+            classification: Classification result with low confidence
+            
+        Returns:
+            Dictionary with clarifying question
+        """
+        clarification_response = f'''I want to make sure I understand your question correctly. 
+
+Could you please provide more details about what you're looking for? For example:
+- Are you asking about a specific topic or concept?
+- Do you need current/recent information or general knowledge?
+- Are you looking for academic research or general information?
+
+Your query: "{query}"'''
+        
+        # Add to memory
+        with self.lock:
+            self.memory.add_user_message(query)
+            self.memory.add_ai_message(clarification_response)
+        
+        return {
+            "query": query,
+            "classification": classification,
+            "search_results": [],
+            "synthesized_answer": clarification_response,
+            "needs_clarification": True
+        }
+    
+    def _process_search_query(self, query: str, classification, enabled_tools: List[str] = None) -> Dict[str, Any]:
+        """Process a search query through tool execution and synthesis.
+        
+        Args:
+            query: User's query
+            classification: Classification result
+            enabled_tools: List of enabled tools
+            
+        Returns:
+            Dictionary with search results and synthesized answer
+        """
         # Determine which tools to use based on classification and enabled_tools filter
-        tools_to_use = [classification.primary_tool] + classification.secondary_tools
+        tools_to_use = [classification.primary_tool] + classification.secondary_tools if classification.primary_tool else []
         
         # Filter tools based on enabled_tools parameter
         if enabled_tools:
