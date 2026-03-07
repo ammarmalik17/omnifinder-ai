@@ -50,28 +50,45 @@ class SearchAgent:
         # Thread lock for thread safety
         self.lock = threading.Lock()
     
-    def process_query(self, query: str) -> Dict[str, Any]:
+    def process_query(
+        self, 
+        query: str, 
+        enabled_tools: List[str] = None,
+        use_react: bool = None
+    ) -> Dict[str, Any]:
         """
         Process a user query through the full pipeline.
         
         Args:
             query: The user's query string
+            enabled_tools: List of tool names to enable (None = all tools)
+            use_react: Whether to use ReAct mode for complex queries (None = use default logic)
             
         Returns:
             Dictionary containing classification, search results, and synthesized answer
         """
-        self.logger.log_query_processing(query, "react" if self._is_complex_query(query, self.query_classifier.classify(query)) else "traditional")
+        # Determine if we should use ReAct
+        should_use_react = use_react if use_react is not None else self.use_react_for_complex
+        
+        self.logger.log_query_processing(query, "react" if should_use_react else "traditional")
         
         # Classify the query to determine which tools to use
         classification = self.query_classifier.classify(query)
         
         # For complex queries that might benefit from ReAct reasoning, use the ReAct agent
-        if self.use_react_for_complex and self._is_complex_query(query, classification):
+        if should_use_react and self._is_complex_query(query, classification):
             self.logger.info(f"Using ReAct pattern for complex query: {query[:50]}...")
             return self._process_with_react(query)
         
-        # Determine which tools to use
+        # Determine which tools to use based on classification and enabled_tools filter
         tools_to_use = [classification.primary_tool] + classification.secondary_tools
+        
+        # Filter tools based on enabled_tools parameter
+        if enabled_tools:
+            tools_to_use = [tool for tool in tools_to_use if tool in enabled_tools]
+            # Ensure at least one tool is available
+            if not tools_to_use:
+                tools_to_use = [enabled_tools[0]] if enabled_tools else ["web_search"]
         
         # Execute search tools concurrently
         search_results = self._execute_search_tools(query, tools_to_use)
@@ -211,15 +228,17 @@ class SearchAgent:
         with self.lock:
             self.memory.clear()
     
-    def chat(self, query: str) -> str:
+    def chat(self, query: str, enabled_tools: List[str] = None, use_react: bool = None) -> str:
         """
         Simple chat interface that returns just the answer.
         
         Args:
             query: The user's query
+            enabled_tools: List of tool names to enable (None = all tools)
+            use_react: Whether to use ReAct mode for complex queries (None = use default logic)
             
         Returns:
             The synthesized answer
         """
-        result = self.process_query(query)
+        result = self.process_query(query, enabled_tools=enabled_tools, use_react=use_react)
         return result["synthesized_answer"]

@@ -114,6 +114,42 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# Tool and capability toggles (placed before chat input)
+st.markdown("### 🔧 Tools & Capabilities")
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    use_wikipedia = st.toggle("📚 Wikipedia", value=True, help="Search Wikipedia for general knowledge")
+    
+with col2:
+    use_arxiv = st.toggle("📄 ArXiv", value=True, help="Search academic papers on ArXiv")
+    
+with col3:
+    use_duckduckgo = st.toggle("🌐 DuckDuckGo", value=True, help="Search web for current events and news")
+    
+with col4:
+    use_react = st.toggle("🧠 ReAct Mode", value=True, help="Enable advanced reasoning for complex queries")
+
+# Store enabled tools in session state
+st.session_state.enabled_tools = []
+if use_wikipedia:
+    st.session_state.enabled_tools.append("wikipedia")
+if use_arxiv:
+    st.session_state.enabled_tools.append("arxiv")
+if use_duckduckgo:
+    st.session_state.enabled_tools.append("duckduckgo")
+# web_search is always available as fallback
+st.session_state.enabled_tools.append("web_search")
+
+st.session_state.use_react_mode = use_react
+
+# Visual indicator of active tools
+if st.session_state.enabled_tools:
+    active_tools_str = " • ".join([t.replace("_", " ").title() for t in st.session_state.enabled_tools])
+    if st.session_state.use_react_mode:
+        active_tools_str += " • 🧠 ReAct"
+    st.caption(f"🔧 Active: {active_tools_str}")
+
 # Chat input
 if prompt := st.chat_input("Ask me anything..."):
     # Add user message to session state
@@ -129,9 +165,16 @@ if prompt := st.chat_input("Ask me anything..."):
             print("\n" + "="*60)
             print(f"User Query: {prompt}")
             print("="*60)
+            print(f"Enabled tools: {st.session_state.enabled_tools}")
+            print(f"ReAct mode: {st.session_state.use_react_mode}")
             
             try:
-                result = agent.process_query(prompt)
+                # Pass configuration to the agent
+                result = agent.process_query(
+                    prompt,
+                    enabled_tools=st.session_state.enabled_tools,
+                    use_react=st.session_state.use_react_mode
+                )
                 synthesized_answer = result["synthesized_answer"]
                 
                 print("\n✓ Query processed successfully")
