@@ -38,7 +38,7 @@ OmniFinder AI is an intelligent search agent powered by LangChain and LLMs that 
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/omnifinder-ai.git
+git clone https://github.com/ammarmalik17/omnifinder-ai.git
 cd omnifinder-ai
 ```
 
@@ -284,7 +284,7 @@ Contributions are welcome! Here's how to get started:
 
 ### Getting Help
 
-- Check existing [issues](https://github.com/yourusername/omnifinder-ai/issues)
+- Check existing [issues](https://github.com/ammarmalik17/omnifinder-ai/issues)
 - Open a new issue with:
   - Detailed error messages
   - Steps to reproduce
@@ -333,42 +333,5 @@ Enhance `src/components/result_synthesizer.py` to:
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 👥 Authors & Acknowledgments
-
-### Powered By
-
-This project leverages several excellent open-source projects and services:
-
-- **LangChain**: For orchestrating LLM interactions
-- **Streamlit**: For the interactive web interface
-- **OpenRouter**: For providing free access to multiple LLM models
-- **Wikipedia API**: For general knowledge search
-- **ArXiv API**: For academic paper search
-- **DuckDuckGo**: For web search results
-
-### Special Thanks
-
-- The open-source AI/ML community
-- Contributors who have provided feedback and improvements
-- All users for their support and suggestions
-
-## 📞 Feedback & Feature Requests
-
-Have ideas for improvements? We'd love to hear from you!
-
-- **Bug Reports**: Open an issue on GitHub
-- **Feature Requests**: Suggest features in discussions or issues
-- **Questions**: Ask in the issues section
-
-## 🚀 Quick Start Checklist
-
-- [ ] Clone the repository
-- [ ] Create a virtual environment
-- [ ] Install dependencies
-- [ ] Set up `.env` file with OpenRouter API key
-- [ ] Run `streamlit run app.py`
-- [ ] Try a sample query
-- [ ] Explore configuration options
 
 ---
