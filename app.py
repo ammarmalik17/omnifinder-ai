@@ -172,6 +172,9 @@ if prompt := st.chat_input("Ask me anything..."):
                 print("\n✓ Query processed successfully")
                 print(f"Synthesized answer length: {len(synthesized_answer)} characters")
                 
+                # Create a placeholder for streaming the response
+                response_placeholder = st.empty()
+                
                 # Check if ReAct was used (indicated by presence of react_steps)
                 if "react_steps" in result:
                     # Show ReAct steps for complex queries
@@ -204,20 +207,25 @@ if prompt := st.chat_input("Ask me anything..."):
                             st.write(f"**Secondary Tools:** {', '.join(classification.secondary_tools)}")
                         st.write(f"**Reasoning:** {classification.reasoning}")
                     
-                    # Show search results
-                    with st.expander("📊 Search Results", expanded=True):
-                        if search_results:
+                    # Show search results only if there are results
+                    if search_results:
+                        with st.expander("📊 Search Results", expanded=True):
                             for search_result in search_results:
                                 tool_name = search_result.get("tool_name", "Unknown Tool")
                                 content = search_result.get("content", "No content returned")
                                 st.write(f"**Results from {tool_name}:**")
                                 st.text_area(f"{tool_name} results", content, height=200)
-                        else:
-                            st.write("No search results returned.")
                 
-                # Show synthesized answer
+                # Stream the synthesized answer progressively
                 with st.expander("✨ Synthesized Answer", expanded=True):
-                    st.write(synthesized_answer)
+                    # Use write_stream for progressive display
+                    def answer_generator():
+                        # Split into chunks for streaming effect
+                        chunks = [synthesized_answer[i:i+50] for i in range(0, len(synthesized_answer), 50)]
+                        for chunk in chunks:
+                            yield chunk + " "
+                    
+                    st.write_stream(answer_generator)
                 
                 # Add assistant response to session state
                 st.session_state.messages.append({"role": "assistant", "content": synthesized_answer})
