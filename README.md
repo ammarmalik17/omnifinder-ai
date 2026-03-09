@@ -45,12 +45,14 @@ cd omnifinder-ai
 ### Step 2: Create a Virtual Environment
 
 **Windows:**
+
 ```bash
 python -m venv venv
 venv\Scripts\activate
 ```
 
 **macOS/Linux:**
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
@@ -71,6 +73,7 @@ OPENROUTER_API_KEY=your_openrouter_api_key_here
 ```
 
 To get a free OpenRouter API key:
+
 1. Visit [OpenRouter.ai](https://openrouter.ai)
 2. Sign up for a free account
 3. Navigate to the API Keys section
@@ -116,6 +119,7 @@ The application will open in your default web browser at `http://localhost:8501`
 ### Configuration Options
 
 #### LLM Model Selection
+
 - Browse available free models from OpenRouter
 - Switch models based on:
   - **Speed**: Smaller models are faster
@@ -123,11 +127,13 @@ The application will open in your default web browser at `http://localhost:8501`
   - **Latency**: Local models may have lower latency
 
 #### Max History Slider
+
 - **Values**: 1-50 messages
 - **Impact**: Higher values increase context but consume more tokens
 - **Use Case**: Increase for complex, multi-turn conversations
 
 #### Tool Toggles
+
 - **Wikipedia**: For general knowledge and definitions
 - **ArXiv**: For academic papers and research
 - **Web Search**: For current events and comprehensive results
@@ -263,21 +269,25 @@ Contributions are welcome! Here's how to get started:
 ### Common Issues
 
 **"Please set your OPENROUTER_API_KEY in the .env file"**
+
 - Ensure your `.env` file exists in the project root
 - Verify the API key format is correct
 - Check that environment variables are properly loaded
 
 **"Error fetching models"**
+
 - Verify your OpenRouter API key is valid
 - Check internet connection
 - Try restarting the application
 
 **No search results returned**
+
 - Verify internet connectivity
 - Check if the search APIs are accessible
 - Try a different query or enable additional tools
 
 **Application runs slowly**
+
 - Reduce `max_workers` in agent configuration
 - Lower the model complexity if possible
 - Check system resources and available memory
@@ -304,6 +314,7 @@ To add a new search tool:
 ### Custom Query Classifiers
 
 Modify the query classification logic in `src/components/query_classifier.py` to:
+
 - Add domain-specific classification rules
 - Adjust tool priority weights
 - Implement custom classification algorithms
@@ -311,6 +322,7 @@ Modify the query classification logic in `src/components/query_classifier.py` to
 ### Extending Result Synthesis
 
 Enhance `src/components/result_synthesizer.py` to:
+
 - Create custom formatting for results
 - Add source attribution
 - Implement custom ranking algorithms
