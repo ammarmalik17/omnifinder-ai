@@ -1,7 +1,8 @@
-from typing import Literal, List
+from typing import Literal, List, AsyncGenerator
 from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openrouter import ChatOpenRouter
+import asyncio
 
 
 class QueryClassification(BaseModel):
@@ -131,3 +132,48 @@ Respond with structured classification including all fields."""),
         result = self.chain.invoke({"query": query})
         # Structured output returns already-parsed Pydantic model with validation
         return result
+    
+    async def stream_classify(self, query: str) -> AsyncGenerator[str, None]:
+        """
+        Stream the classification process with progressive rendering.
+        
+        Args:
+            query: The user's query string
+            
+        Yields:
+            Chunks of the classification reasoning as it's being processed
+        """
+        try:
+            # Stream the classification reasoning
+            yield "🔍 Analyzing query intent...\n\n"
+            await asyncio.sleep(0.1)
+            
+            # Stream the intent detection process
+            yield "🧠 Detecting intent type...\n\n"
+            await asyncio.sleep(0.1)
+            
+            # Get the classification result
+            classification = self.classify(query)
+            
+            # Stream the classification details
+            yield f"📊 **Intent Type**: {classification.intent_type}\n\n"
+            await asyncio.sleep(0.05)
+            
+            if classification.intent_type == "conversational":
+                yield f"💬 **Conversational Intent**: {classification.conversational_intent}\n\n"
+                yield f"💡 **Reasoning**: {classification.reasoning}\n\n"
+                yield f"🎯 **Confidence**: {classification.confidence:.2f}\n\n"
+            else:
+                yield f"🔍 **Primary Tool**: {classification.primary_tool}\n\n"
+                if classification.secondary_tools:
+                    yield f"🔧 **Secondary Tools**: {', '.join(classification.secondary_tools)}\n\n"
+                yield f"💡 **Reasoning**: {classification.reasoning}\n\n"
+                yield f"🎯 **Confidence**: {classification.confidence:.2f}\n\n"
+                
+                if classification.needs_clarification:
+                    yield "❓ **Note**: Query needs clarification due to low confidence.\n\n"
+            
+            yield "✅ Classification complete!\n\n"
+            
+        except Exception as e:
+            yield f"❌ Error during classification: {str(e)}"

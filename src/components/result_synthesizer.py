@@ -1,6 +1,7 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, AsyncGenerator
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openrouter import ChatOpenRouter
+import asyncio
 
 
 class ResultSynthesizer:
@@ -64,3 +65,57 @@ Please synthesize these results into a comprehensive answer to the original quer
         })
         
         return response.content
+    
+    async def stream_synthesize(self, query: str, search_results: List[Dict[str, Any]]) -> AsyncGenerator[str, None]:
+        """
+        Stream the synthesis process with progressive rendering.
+        
+        Args:
+            query: The original user query
+            search_results: List of search results from various tools
+            
+        Yields:
+            Chunks of the synthesized response as they become available
+        """
+        try:
+            # Stream the analysis process
+            yield "🔍 Analyzing search results...\n\n"
+            await asyncio.sleep(0.1)
+            
+            # Stream each source with attribution
+            for i, result in enumerate(search_results):
+                tool_name = result.get('tool_name', 'Unknown Tool')
+                content = result.get('content', '')
+                
+                if content:
+                    yield f"📚 Processing **{tool_name}** results...\n\n"
+                    await asyncio.sleep(0.05)
+                    
+                    # Stream content in chunks for long results
+                    if len(content) > 200:
+                        summary = content[:300] + "..." if len(content) > 300 else content
+                        yield f"📋 Key information from {tool_name}:\n"
+                        for j in range(0, len(summary), 15):
+                            chunk = summary[j:j+15]
+                            yield chunk
+                            await asyncio.sleep(0.01)
+                        yield "\n\n"
+                    else:
+                        yield f"📝 {content}\n\n"
+                        await asyncio.sleep(0.05)
+            
+            # Stream the final synthesis
+            yield "✨ Synthesizing comprehensive answer...\n\n"
+            await asyncio.sleep(0.2)
+            
+            # Get the final synthesized answer
+            final_answer = self.synthesize(query, search_results)
+            
+            # Stream the final answer
+            for k in range(0, len(final_answer), 4):
+                chunk = final_answer[k:k+4]
+                yield chunk
+                await asyncio.sleep(0.01)
+                
+        except Exception as e:
+            yield f"❌ Error during synthesis: {str(e)}"

@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, AsyncGenerator
 from langchain_openrouter import ChatOpenRouter
 from src.components.query_classifier import QueryClassifier
 from src.tools.search_tools import get_all_tools
@@ -11,6 +11,7 @@ from langchain_core.messages import BaseMessage
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from src.components.conversational_handler import ConversationalHandler
+import asyncio
 
 
 class SearchAgent:
@@ -338,3 +339,73 @@ Your query: "{query}"'''
         """
         result = self.process_query(query, enabled_tools=enabled_tools, use_react=use_react)
         return result["synthesized_answer"]
+    
+    async def stream_synthesized_answer(self, query: str, result: Dict[str, Any]) -> AsyncGenerator[str, None]:
+        """
+        Stream the synthesized answer using true LLM streaming.
+        
+        Args:
+            query: The user's query
+            result: The result from process_query
+            
+        Yields:
+            Chunks of the synthesized answer as they become available
+        """
+        try:
+            # For conversational responses, stream directly
+            if result.get("conversational"):
+                response = result["synthesized_answer"]
+                # Stream character by character for smooth typing effect
+                for i in range(0, len(response), 3):
+                    chunk = response[i:i+3]
+                    yield chunk
+                    await asyncio.sleep(0.01)  # Small delay for smooth streaming
+                return
+            
+            # For search results, we need to stream the synthesis process
+            search_results = result.get("search_results", [])
+            if not search_results:
+                yield result.get("synthesized_answer", "")
+                return
+            
+            # Stream the synthesis process step by step
+            yield "🔍 Analyzing search results...\n\n"
+            await asyncio.sleep(0.1)
+            
+            # Stream each search result with attribution
+            for i, search_result in enumerate(search_results):
+                tool_name = search_result.get("tool_name", "Unknown Tool")
+                content = search_result.get("content", "")
+                
+                yield f"📚 Processing results from **{tool_name}**...\n\n"
+                await asyncio.sleep(0.1)
+                
+                # Stream the content in chunks
+                if content and len(content) > 100:
+                    # For long content, summarize first
+                    yield f"📋 Key findings from {tool_name}:\n"
+                    summary = content[:200] + "..." if len(content) > 200 else content
+                    for j in range(0, len(summary), 10):
+                        chunk = summary[j:j+10]
+                        yield chunk
+                        await asyncio.sleep(0.02)
+                    yield "\n\n"
+                else:
+                    # For short content, show it directly
+                    yield f"📝 {content}\n\n"
+                    await asyncio.sleep(0.1)
+            
+            # Stream the final synthesis
+            yield "✨ Synthesizing comprehensive answer...\n\n"
+            await asyncio.sleep(0.2)
+            
+            # Stream the final answer
+            final_answer = result.get("synthesized_answer", "")
+            if final_answer:
+                for k in range(0, len(final_answer), 5):
+                    chunk = final_answer[k:k+5]
+                    yield chunk
+                    await asyncio.sleep(0.015)
+                
+        except Exception as e:
+            yield f"❌ Error during streaming: {str(e)}"

@@ -4,11 +4,12 @@ ReAct (Reasoning and Acting) Agent Implementation for OmniFinder AI.
 This module implements the ReAct pattern for search agents, which alternates between
 reasoning about the problem and taking actions with tools to solve complex queries.
 """
-from typing import List, Dict, Any
+from typing import List, Dict, Any, AsyncGenerator
 from langchain_core.tools import BaseTool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage
 from langchain_openrouter import ChatOpenRouter
+import asyncio
 
 
 class ReActSearchAgent:
@@ -216,6 +217,164 @@ Your response should be informative, well-structured, and cite sources when poss
             "iterations": iteration,
             "messages": messages
         }
+    
+    async def stream_process_query(self, query: str) -> AsyncGenerator[str, None]:
+        """
+        Stream the ReAct process with progressive rendering.
+        
+        Args:
+            query: The user's query
+            
+        Yields:
+            Chunks of the ReAct process as it unfolds
+        """
+        try:
+            yield "🧠 Starting ReAct reasoning process...\n\n"
+            await asyncio.sleep(0.1)
+            
+            # Initialize conversation with the user query
+            messages = [HumanMessage(content=query)]
+            steps = []
+            max_iterations = 10
+            iteration = 0
+            
+            # Build tool descriptions for the prompt
+            tool_descriptions = "\n".join([
+                f"- {tool.name}: {tool.description}" 
+                for tool in self.tools.values()
+            ])
+            
+            yield f"📋 Available tools: {', '.join(self.tools.keys())}\n\n"
+            await asyncio.sleep(0.1)
+            
+            while iteration < max_iterations:
+                iteration += 1
+                yield f"🔄 **Iteration {iteration}** - Reasoning...\n\n"
+                await asyncio.sleep(0.1)
+                
+                try:
+                    # Get the next message from the LLM
+                    response = self.chain.invoke({
+                        "messages": messages,
+                        "tool_descriptions": tool_descriptions
+                    })
+                    
+                    # Add the AI's response to the conversation
+                    messages.append(response)
+                    
+                    # Parse the response to check for tool usage
+                    response_content = response.content if hasattr(response, 'content') else str(response)
+                    
+                    # Check if the response contains an action (tool call)
+                    if "ACTION:" in response_content.upper():
+                        yield f"🎯 **Step {iteration}**: Tool usage detected\n\n"
+                        await asyncio.sleep(0.05)
+                        
+                        # Parse the action and arguments
+                        action_line = None
+                        args_line = None
+                        
+                        lines = response_content.split('\n')
+                        for i, line in enumerate(lines):
+                            if line.strip().upper().startswith('ACTION:'):
+                                action_line = line
+                                # Look for ARGS in the next few lines
+                                for j in range(i+1, min(i+4, len(lines))):
+                                    if lines[j].strip().upper().startswith('ARGS:'):
+                                        args_line = lines[j]
+                                        break
+                                break
+                        
+                        if action_line:
+                            # Extract tool name
+                            tool_name = action_line.split(':', 1)[1].strip().lower()
+                            
+                            # Extract arguments
+                            tool_args = {}
+                            if args_line:
+                                import json
+                                try:
+                                    args_str = args_line.split(':', 1)[1].strip()
+                                    tool_args = json.loads(args_str)
+                                except:
+                                    tool_args = {'query': query}
+                            else:
+                                tool_args = {'query': query}
+                            
+                            # Log the step
+                            steps.append({
+                                "step": iteration,
+                                "action": "tool_call",
+                                "tool": tool_name,
+                                "arguments": tool_args
+                            })
+                            
+                            # Execute the tool
+                            if tool_name in self.tools:
+                                tool = self.tools[tool_name]
+                                try:
+                                    tool_result = tool._run(**tool_args)
+                                    yield f"🔧 **Tool Result**: {tool_name} returned:\n```\n{tool_result[:200]}{'...' if len(tool_result) > 200 else ''}\n```\n\n"
+                                    await asyncio.sleep(0.1)
+                                except Exception as e:
+                                    tool_result = f"Error executing {tool_name}: {str(e)}"
+                                    yield f"❌ **Tool Error**: {tool_result}\n\n"
+                                    await asyncio.sleep(0.1)
+                            else:
+                                tool_result = f"Unknown tool: {tool_name}"
+                                yield f"❓ **Unknown Tool**: {tool_result}\n\n"
+                                await asyncio.sleep(0.1)
+                            
+                            # Add the tool result as a HumanMessage
+                            tool_message = HumanMessage(
+                                content=f"Observation from {tool_name}: {tool_result}"
+                            )
+                            messages.append(tool_message)
+                            
+                            # Log the result
+                            steps.append({
+                                "step": iteration,
+                                "action": "tool_result",
+                                "tool": tool_name,
+                                "result": tool_result
+                            })
+                        else:
+                            yield f"📝 **Step {iteration}**: Generating final response\n\n"
+                            await asyncio.sleep(0.1)
+                            steps.append({
+                                "step": iteration,
+                                "action": "final_response",
+                                "content": response_content
+                            })
+                            break
+                    else:
+                        yield f"📝 **Step {iteration}**: Final response generated\n\n"
+                        await asyncio.sleep(0.1)
+                        steps.append({
+                            "step": iteration,
+                            "action": "final_response",
+                            "content": response_content
+                        })
+                        break
+                        
+                except Exception as e:
+                    yield f"❌ **Error in iteration {iteration}**: {str(e)}\n\n"
+                    await asyncio.sleep(0.1)
+                    break
+            
+            yield f"✅ **ReAct Process Complete** - {iteration} iterations\n\n"
+            await asyncio.sleep(0.1)
+            
+            # Stream the final answer
+            final_answer = response.content if hasattr(response, 'content') and response.content else str(response)
+            yield "✨ **Final Answer**:\n\n"
+            for k in range(0, len(final_answer), 6):
+                chunk = final_answer[k:k+6]
+                yield chunk
+                await asyncio.sleep(0.01)
+                
+        except Exception as e:
+            yield f"❌ **ReAct Error**: {str(e)}"
 
 
 def create_omnifinder_react_agent(llm: ChatOpenRouter, tools: List[BaseTool]) -> ReActSearchAgent:

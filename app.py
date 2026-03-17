@@ -5,6 +5,8 @@ from langchain_openrouter import ChatOpenRouter
 from openai import OpenAI
 from src.agents.search_agent import SearchAgent
 from src.config.agent_config import AgentConfig
+import asyncio
+from typing import AsyncGenerator, Any
 
 
 # Load environment variables
@@ -75,6 +77,7 @@ if "agent" not in st.session_state:
         model="arcee-ai/trinity-large-preview:free",
         temperature=0,
         api_key=openrouter_api_key,
+        streaming=True,  # Enable true streaming
     )
     # Create agent configuration based on default settings
     agent_config = AgentConfig(
@@ -216,16 +219,27 @@ if prompt := st.chat_input("Ask me anything..."):
                                 st.write(f"**Results from {tool_name}:**")
                                 st.text_area(f"{tool_name} results", content, height=200)
                 
-                # Stream the synthesized answer progressively
+                # Stream the synthesized answer progressively using true streaming
                 with st.expander("✨ Synthesized Answer", expanded=True):
-                    # Use write_stream for progressive display
-                    def answer_generator():
-                        # Split into chunks for streaming effect
-                        chunks = [synthesized_answer[i:i+50] for i in range(0, len(synthesized_answer), 50)]
-                        for chunk in chunks:
-                            yield chunk + " "
+                    # Use true streaming with cancellation support
+                    stop_button = st.button("⏹️ Stop Streaming", key=f"stop_{len(st.session_state.messages)}")
                     
-                    st.write_stream(answer_generator)
+                    # Create a generator that yields tokens as they arrive
+                    async def stream_answer():
+                        try:
+                            # Use the agent's streaming capability
+                            async for chunk in agent.stream_synthesized_answer(prompt, result):
+                                yield chunk
+                        except Exception as e:
+                            yield f"Error during streaming: {str(e)}"
+                    
+                    # Stream the response with cancellation support
+                    try:
+                        st.write_stream(stream_answer())
+                    except asyncio.CancelledError:
+                        st.info("Streaming cancelled by user")
+                    except Exception as e:
+                        st.error(f"Streaming error: {str(e)}")
                 
                 # Add assistant response to session state
                 st.session_state.messages.append({"role": "assistant", "content": synthesized_answer})
