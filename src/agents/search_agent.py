@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, AsyncGenerator
 from langchain_openrouter import ChatOpenRouter
 from src.components.query_classifier import QueryClassifier
-from src.tools.search_tools import get_all_tools
+from src.tools.search import get_all_tools
 from src.components.result_synthesizer import ResultSynthesizer
 from src.components.conversation_memory import ConversationBufferWindowMemory
 from src.core.react_agent import create_omnifinder_react_agent
