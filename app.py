@@ -1,10 +1,9 @@
 import streamlit as st
 from dotenv import load_dotenv
 import os
-from langchain_openrouter import ChatOpenRouter
-from openai import OpenAI
 from src.agents.search_agent import SearchAgent
 from src.config.agent_config import AgentConfig
+from src.core.llm_gateway import get_llm_gateway, create_default_llm, create_llm_with_model
 import asyncio
 from typing import AsyncGenerator, Any
 
@@ -31,75 +30,65 @@ This search agent intelligently routes your queries to the most appropriate sear
 max_history = 10  # Default value that matches the slider's default
 
 
-@st.cache_data(show_spinner=False)
-def get_openrouter_models(api_key):
-    """Fetch available free models from OpenRouter API.
-    
-    Uses OpenAI SDK with OpenRouter base_url for industry-standard model listing.
-    Filters to show only free models (those with :free suffix).
-    Returns sorted list of model IDs or defaults on error.
-    """
-    try:
-        # Initialize OpenAI client configured for OpenRouter
-        client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
-        )
-        
-        # Fetch all available models using standard OpenAI SDK method
-        models_response = client.models.list()
-        
-        # Filter to only free models (those with :free suffix)
-        free_models = [
-            model.id for model in models_response.data 
-            if model.id.endswith(':free')
-        ]
-        
-        # Sort alphabetically for better UX
-        return sorted(free_models)
-        
-    except Exception as e:
-        # Log error and return default fallback model
-        st.error(f"Error fetching models: {str(e)}")
-        return ["arcee-ai/trinity-large-preview:free"]
 
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "agent" not in st.session_state:
-    # Initialize LLM and agent
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-    if not openrouter_api_key:
-        st.error("Please set your OPENROUTER_API_KEY in the .env file")
+    # Initialize LLM and agent using the gateway
+    try:
+        llm = create_default_llm()
+        # Create agent configuration based on default settings
+        agent_config = AgentConfig(
+            max_workers=4,
+            use_react_for_complex=True,
+            max_token_limit=max_history * 300,  # Approximate tokens per message
+            max_history_messages=max_history
+        )
+        st.session_state.agent = SearchAgent(llm, config=agent_config)
+        # Track the current model for dynamic switching
+        st.session_state.current_model = llm.model_name
+    except ValueError as e:
+        st.error(f"LLM initialization error: {str(e)}")
         st.stop()
-        
-    llm = ChatOpenRouter(
-        model="arcee-ai/trinity-large-preview:free",
-        temperature=0,
-        api_key=openrouter_api_key,
-        streaming=True,  # Enable true streaming
-    )
-    # Create agent configuration based on default settings
-    agent_config = AgentConfig(
-        max_workers=4,
-        use_react_for_complex=True,
-        max_token_limit=max_history * 300,  # Approximate tokens per message
-        max_history_messages=max_history
-    )
-    st.session_state.agent = SearchAgent(llm, config=agent_config)
 
 # Sidebar for configuration
 with st.sidebar:
     st.header("Configuration")
     
-    # Get models based on the API key from environment
-    available_models = get_openrouter_models(os.getenv("OPENROUTER_API_KEY", ""))
+    # Get models directly from the LLM Gateway
+    gateway = get_llm_gateway()
+    available_models = gateway.get_available_models()
 
     model_option = st.selectbox(
         "Select LLM Model",
         available_models,
         index=0 if available_models else None
     )
+    
+    # Check if model selection has changed and recreate agent if needed
+    if model_option and st.session_state.current_model != model_option:
+        try:
+            # Create new LLM with the selected model
+            new_llm = create_llm_with_model(model_option)
+            
+            # Create new agent configuration
+            agent_config = AgentConfig(
+                max_workers=4,
+                use_react_for_complex=True,
+                max_token_limit=max_history * 300,
+                max_history_messages=max_history
+            )
+            
+            # Create new agent with the new LLM
+            st.session_state.agent = SearchAgent(new_llm, config=agent_config)
+            st.session_state.current_model = model_option
+            
+            # Show success message
+            st.success(f"Model switched to: {model_option}")
+            
+        except Exception as e:
+            st.error(f"Error switching model: {str(e)}")
     
     max_history = st.slider("Max History Messages", 5, 20, 10)
     
@@ -174,9 +163,6 @@ if prompt := st.chat_input("Ask me anything..."):
                 
                 print("\n✓ Query processed successfully")
                 print(f"Synthesized answer length: {len(synthesized_answer)} characters")
-                
-                # Create a placeholder for streaming the response
-                response_placeholder = st.empty()
                 
                 # Check if ReAct was used (indicated by presence of react_steps)
                 if "react_steps" in result:
