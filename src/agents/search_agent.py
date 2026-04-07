@@ -1,5 +1,6 @@
 import asyncio
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, AsyncGenerator, Dict, List
 
@@ -80,31 +81,50 @@ class SearchAgent:
         Returns:
             Dictionary containing classification, search results, and synthesized answer
         """
-        # STEP 1: Intent Detection
-        classification = self.query_classifier.classify(query)
+        # Start comprehensive query timing
+        self.logger.start_query_timing(query)
         
-        self.logger.log_query_processing(
-            query, 
-            "conversational" if classification.intent_type == "conversational" else ("react" if self.use_react_for_complex else "traditional")
-        )
-        
-        # STEP 2: Handle Conversational Intents (NO SEARCH)
-        if classification.intent_type == "conversational":
-            return self._handle_conversational_intent(query, classification)
-        
-        # STEP 3: Check for Low Confidence / Need Clarification
-        if classification.needs_clarification or classification.confidence < 0.5:
-            return self._handle_low_confidence(query, classification)
-        
-        # STEP 4: Determine if we should use ReAct for complex queries
-        should_use_react = use_react if use_react is not None else self.use_react_for_complex
-        
-        if should_use_react and self._is_complex_query(query, classification):
-            self.logger.info(f"Using ReAct pattern for complex query: {query[:50]}...")
-            return self._process_with_react(query)
-        
-        # STEP 5: Traditional search routing
-        return self._process_search_query(query, classification, enabled_tools)
+        try:
+            # STEP 1: Intent Detection
+            with self.logger.log_timing_context("Query Classification", f"Query: {query[:100]}"):
+                classification = self.query_classifier.classify(query)
+            
+            self.logger.log_classification(
+                classification.primary_tool,
+                classification.secondary_tools,
+                classification.confidence
+            )
+            self.logger.log_query_processing(
+                query, 
+                "conversational" if classification.intent_type == "conversational" else ("react" if self.use_react_for_complex else "traditional")
+            )
+            
+            # STEP 2: Handle Conversational Intents (NO SEARCH)
+            if classification.intent_type == "conversational":
+                self.logger.log_step("Handling conversational intent", f"Intent type: {classification.conversational_intent}")
+                return self._handle_conversational_intent(query, classification)
+            
+            # STEP 3: Check for Low Confidence / Need Clarification
+            if classification.needs_clarification or classification.confidence < 0.5:
+                self.logger.log_step("Low confidence detected", f"Confidence: {classification.confidence:.2f}, Needs clarification: {classification.needs_clarification}")
+                return self._handle_low_confidence(query, classification)
+            
+            # STEP 4: Determine if we should use ReAct for complex queries
+            should_use_react = use_react if use_react is not None else self.use_react_for_complex
+            
+            if should_use_react and self._is_complex_query(query, classification):
+                self.logger.log_step("Complex query detected - using ReAct pattern")
+                self.logger.info(f"Using ReAct pattern for complex query: {query[:50]}...")
+                return self._process_with_react(query)
+            
+            # STEP 5: Traditional search routing
+            self.logger.log_step("Traditional search routing")
+            return self._process_search_query(query, classification, enabled_tools)
+            
+        except Exception as e:
+            self.logger.error(f"Error processing query: {str(e)}", exc_info=True)
+            self.logger.end_query_timing(success=False)
+            raise
     
     def _handle_conversational_intent(self, query: str, classification) -> Dict[str, Any]:
         """Handle conversational intents without search.
@@ -181,6 +201,7 @@ Your query: "{query}"'''
         """
         # Determine which tools to use based on classification and enabled_tools filter
         tools_to_use = [classification.primary_tool] + classification.secondary_tools if classification.primary_tool else []
+        self.logger.log_step("Tool selection", f"Primary: {classification.primary_tool}, Secondary: {classification.secondary_tools}")
         
         # Filter tools based on enabled_tools parameter
         if enabled_tools:
@@ -189,16 +210,29 @@ Your query: "{query}"'''
             if not tools_to_use:
                 tools_to_use = [enabled_tools[0]] if enabled_tools else ["web_search"]
         
+        self.logger.info(f"📋 Tools to execute: {tools_to_use}")
+        
         # Execute search tools concurrently
-        search_results = self._execute_search_tools(query, tools_to_use)
+        with self.logger.log_timing_context("Concurrent Tool Execution", f"Tools: {', '.join(tools_to_use)}"):
+            search_results = self._execute_search_tools(query, tools_to_use)
+        
+        self.logger.log_step("Tool execution complete", f"Got results from {len(search_results)} tools")
         
         # Synthesize results into a comprehensive answer
-        synthesized_answer = self.result_synthesizer.synthesize(query, search_results)
+        with self.logger.log_timing_context("Result Synthesis", f"Synthesizing from {len(search_results)} sources"):
+            self.logger.log_synthesis_start(len(search_results))
+            synthesized_answer = self.result_synthesizer.synthesize(query, search_results)
+            self.logger.log_synthesis_complete(0, len(synthesized_answer))
         
         # Add to memory
         with self.lock:
             self.memory.add_user_message(query)
             self.memory.add_ai_message(synthesized_answer)
+            msg_count = len(self.memory.get_messages())
+            self.logger.log_memory_operation("add_messages", msg_count)
+        
+        # End query timing
+        self.logger.end_query_timing(success=True)
         
         return {
             "query": query,
@@ -267,6 +301,7 @@ Your query: "{query}"'''
             List of results from each tool
         """
         search_results = []
+        tool_timings = {}
         
         # Use ThreadPoolExecutor to run tools concurrently
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -274,19 +309,26 @@ Your query: "{query}"'''
             future_to_tool = {}
             for tool_name in tools_to_use:
                 if tool_name in self.tools:
-                    future = executor.submit(self._execute_single_tool, tool_name, query)
+                    self.logger.log_tool_usage(tool_name, query)
+                    future = executor.submit(self._execute_single_tool_with_timing, tool_name, query)
                     future_to_tool[future] = tool_name
+                    tool_timings[tool_name] = {'start': time.time()}
             
             # Collect results as they complete
             for future in as_completed(future_to_tool):
                 tool_name = future_to_tool[future]
+                tool_start = tool_timings[tool_name]['start']
+                tool_duration = time.time() - tool_start
+                
                 try:
                     result = future.result()
+                    self.logger.log_tool_result(tool_name, tool_duration, len(result))
                     search_results.append({
                         "tool_name": tool_name,
                         "content": result
                     })
                 except Exception as e:
+                    self.logger.log_tool_error(tool_name, str(e), tool_duration)
                     error_msg = f"Error with {tool_name}: {str(e)}"
                     search_results.append({
                         "tool_name": tool_name,
@@ -317,6 +359,30 @@ Your query: "{query}"'''
             raise ValueError(f"Tool '{tool_name}' not found")
         
         return tool._run(query)
+    
+    def _execute_single_tool_with_timing(self, tool_name: str, query: str) -> str:
+        """
+        Execute a single search tool with detailed timing.
+        
+        Args:
+            tool_name: Name of the tool to execute
+            query: The user's query
+            
+        Returns:
+            Tool execution result
+        """
+        start_time = time.time()
+        self.logger.info(f"▶️ Executing tool: {tool_name}")
+        
+        try:
+            result = self._execute_single_tool(tool_name, query)
+            elapsed = time.time() - start_time
+            self.logger.info(f"✔️ Tool {tool_name} completed in {elapsed:.3f}s (result: {len(result)} chars)")
+            return result
+        except Exception as e:
+            elapsed = time.time() - start_time
+            self.logger.error(f"✖️ Tool {tool_name} failed after {elapsed:.3f}s: {str(e)}")
+            raise
     
     def get_conversation_history(self) -> List[BaseMessage]:
         """Get the current conversation history."""

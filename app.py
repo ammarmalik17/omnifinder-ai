@@ -164,6 +164,16 @@ if prompt := st.chat_input("Ask me anything..."):
                 print("\n✓ Query processed successfully")
                 print(f"Synthesized answer length: {len(synthesized_answer)} characters")
                 
+                # Print detailed timing summary if available
+                if "react_iterations" in result:
+                    print(f"ReAct iterations: {result['react_iterations']}")
+                if "classification" in result and result["classification"]:
+                    cls = result["classification"]
+                    print(f"Primary tool: {cls.primary_tool}")
+                    if cls.secondary_tools:
+                        print(f"Secondary tools: {', '.join(cls.secondary_tools)}")
+                    print(f"Confidence: {cls.confidence:.2f}")
+                
                 # Check if ReAct was used (indicated by presence of react_steps)
                 if "react_steps" in result:
                     # Show ReAct steps for complex queries
