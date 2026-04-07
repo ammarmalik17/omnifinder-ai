@@ -1,5 +1,6 @@
-from langchain_core.tools import BaseTool
 import arxiv
+from langchain_core.tools import BaseTool
+
 from src.config.agent_config import AgentConfig
 
 

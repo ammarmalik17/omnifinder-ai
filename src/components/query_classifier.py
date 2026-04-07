@@ -1,8 +1,9 @@
-from typing import Literal, List, AsyncGenerator
-from pydantic import BaseModel, Field
+import asyncio
+from typing import AsyncGenerator, List, Literal
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openrouter import ChatOpenRouter
-import asyncio
+from pydantic import BaseModel, Field
 
 
 class QueryClassification(BaseModel):
@@ -109,7 +110,7 @@ For SEARCH intents:
 Respond with structured classification including all fields."""),
             ("human", "{query}")
         ])
-        
+
         # Create chain with structured output
         self.chain = self.prompt | self.structured_llm
     

@@ -4,9 +4,10 @@ Conversational Response Handler for OmniFinder AI.
 Handles greetings, small talk, thanks, and other conversational intents
 without triggering unnecessary web searches.
 """
-from typing import Dict, Any
-from langchain_openrouter import ChatOpenRouter
+from typing import Any, Dict
+
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_openrouter import ChatOpenRouter
 
 
 class ConversationalHandler:
