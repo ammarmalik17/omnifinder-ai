@@ -11,7 +11,7 @@ from langchain_core.messages import (
     SystemMessage,
     trim_messages,
 )
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openrouter import ChatOpenRouter
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,12 @@ logger = logging.getLogger(__name__)
 class ConversationBufferWindowMemory:
     """Manages conversation history with a sliding window to stay within token limits."""
 
-    def __init__(self, llm: ChatOpenRouter, max_token_limit: int = 3000, max_history_messages: int = 10):
+    def __init__(
+        self,
+        llm: ChatOpenRouter,
+        max_token_limit: int = 3000,
+        max_history_messages: int = 10,
+    ):
         self.llm = llm
         self.max_token_limit = max_token_limit
         self.max_history_messages = max_history_messages
@@ -92,7 +97,7 @@ class ConversationBufferWindowMemory:
         """Trim messages to stay within token and message count limits."""
         # First, limit by message count
         if len(self.messages) > self.max_history_messages:
-            self.messages = self.messages[-self.max_history_messages:]
+            self.messages = self.messages[-self.max_history_messages :]
             # Simplified cache invalidation: clear and repopulate lazily
             self._token_cache.clear()
 
@@ -106,9 +111,9 @@ class ConversationBufferWindowMemory:
                 max_tokens=self.max_token_limit,
                 strategy="last",  # Keep messages from the end
                 start_on="human",  # Start keeping messages from the most recent human message
-                include_system=True  # Always include system messages
+                include_system=True,  # Always include system messages
             )
-            
+
             self.messages = trimmed_messages
             # Simplified cache invalidation: clear and repopulate lazily
             self._token_cache.clear()
@@ -158,32 +163,42 @@ class ConversationBufferWindowMemory:
 
 class ConversationSummaryMemory:
     """Maintains conversation history by summarizing older interactions."""
-    
+
     # Number of recent messages to keep as buffer (not summarized)
     RECENT_BUFFER_SIZE = 5
 
     def __init__(
-        self, 
-        llm: ChatOpenRouter, 
+        self,
+        llm: ChatOpenRouter,
         max_token_limit: int = 3000,
-        max_summary_tokens: int = 500
+        max_summary_tokens: int = 500,
     ):
         self.llm = llm
         self.max_token_limit = max_token_limit
         self.max_summary_tokens = max_summary_tokens  # Configurable summary token limit
         self.summary = ""
         self.recent_messages: List[BaseMessage] = []
-        self.token_encoder = tiktoken.get_encoding("cl100k_base")  # Fixed: use cl100k_base
+        self.token_encoder = tiktoken.get_encoding(
+            "cl100k_base"
+        )  # Fixed: use cl100k_base
         self._lock = threading.RLock()  # Thread-safe lock for all state access
         self._token_cache: Dict[int, int] = {}  # Cache token counts by message id
         self._summarizing = False  # Guard against concurrent summarization
         self._summary_token_count: Optional[int] = None  # Cache summary token count
 
         # Create a prompt for summarizing conversations
-        self.summary_prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an expert at summarizing conversations. Create a concise summary that captures the key points and context of the conversation."),
-            ("human", "Please summarize the following conversation:\n\n{conversation}")
-        ])
+        self.summary_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are an expert at summarizing conversations. Create a concise summary that captures the key points and context of the conversation.",
+                ),
+                (
+                    "human",
+                    "Please summarize the following conversation:\n\n{conversation}",
+                ),
+            ]
+        )
         self.summary_chain = self.summary_prompt | self.llm
 
     def __len__(self) -> int:
@@ -193,7 +208,7 @@ class ConversationSummaryMemory:
 
     async def aadd_message(self, message: BaseMessage):
         """Add a message to the conversation history (async version).
-        
+
         This is the primary method for adding messages. Use this in async contexts.
         For synchronous code, use add_message() but note it cannot be called from
         within an async context (use aadd_message directly instead).
@@ -204,14 +219,14 @@ class ConversationSummaryMemory:
             # Cache token count for new message
             self._cache_message_tokens(message)
             needs_summary = self._count_total_tokens_cached() > self.max_token_limit
-        
+
         # Summary generation happens outside the lock to avoid blocking
         if needs_summary and not self._summarizing:
             await self._create_summary_async()
 
     def add_message(self, message: BaseMessage):
         """Add a message to the conversation history (sync wrapper).
-        
+
         Note: This method uses asyncio.run() and cannot be called from within
         an async context. If you're in an async function, use aadd_message() directly.
         """
@@ -232,7 +247,11 @@ class ConversationSummaryMemory:
 
             # Add summary if we have one
             if self.summary:
-                result.append(SystemMessage(content=f"Summary of earlier conversation: {self.summary}"))
+                result.append(
+                    SystemMessage(
+                        content=f"Summary of earlier conversation: {self.summary}"
+                    )
+                )
 
             # Add the recent messages (earlier messages are now in the summary)
             result.extend(self.recent_messages)
@@ -278,24 +297,24 @@ class ConversationSummaryMemory:
             if self._summarizing:
                 return
             self._summarizing = True
-        
+
         try:
             # Determine which messages to summarize (keep a buffer of recent messages)
             with self._lock:
                 if not self.recent_messages:
                     return
-                    
+
                 buffer_size = min(self.RECENT_BUFFER_SIZE, len(self.recent_messages))
                 if len(self.recent_messages) <= buffer_size:
                     return  # Not enough messages to summarize
-                    
+
                 # Get messages to summarize and keep buffered messages
                 messages_to_summarize = self.recent_messages[:-buffer_size]
                 self.recent_messages = self.recent_messages[-buffer_size:]
-                
+
                 # Get IDs of messages being summarized for cache cleanup
                 msg_ids_to_remove = {id(msg) for msg in messages_to_summarize}
-            
+
             # Build conversation text directly from messages_to_summarize (no self.earlier_messages)
             conversation_text = ""
             for msg in messages_to_summarize:
@@ -306,15 +325,16 @@ class ConversationSummaryMemory:
             try:
                 # Run synchronous invoke in a thread to avoid blocking
                 summary_response = await asyncio.to_thread(
-                    self.summary_chain.invoke, 
-                    {"conversation": conversation_text}
+                    self.summary_chain.invoke, {"conversation": conversation_text}
                 )
                 with self._lock:
                     self.summary = summary_response.content
                     # Invalidate cached summary token count
                     self._summary_token_count = None
             except Exception as e:
-                logger.warning(f"LLM summarization failed: {e}. Falling back to truncation.")
+                logger.warning(
+                    f"LLM summarization failed: {e}. Falling back to truncation."
+                )
                 with self._lock:
                     self.summary = self._truncate_text(conversation_text)
                     # Invalidate cached summary token count
@@ -325,7 +345,7 @@ class ConversationSummaryMemory:
                 for msg_id in msg_ids_to_remove:
                     if msg_id in self._token_cache:
                         del self._token_cache[msg_id]
-                        
+
         finally:
             # Always reset the summarizing flag
             with self._lock:
@@ -335,7 +355,7 @@ class ConversationSummaryMemory:
         """Truncate text based on token limit (renamed from _simple_token_summary)."""
         tokens = self.token_encoder.encode(text)
         if len(tokens) > self.max_summary_tokens:
-            tokens = tokens[:self.max_summary_tokens]
+            tokens = tokens[: self.max_summary_tokens]
         return self.token_encoder.decode(tokens)
 
     def _simple_token_summary(self, text: str) -> str:
