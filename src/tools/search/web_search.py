@@ -1,3 +1,5 @@
+from typing import Optional
+
 from ddgs import DDGS
 from langchain_core.tools import BaseTool
 
@@ -10,10 +12,17 @@ class WebSearchTool(BaseTool):
     name: str = "web_search"
     description: str = "Search the web using DuckDuckGo. Use for current events, real-time information, and general web queries."
 
+    config: AgentConfig = AgentConfig()
+
+    def __init__(self, config: Optional[AgentConfig] = None, **kwargs):
+        """Initialize with optional config. Falls back to default AgentConfig."""
+        super().__init__(**kwargs)
+        if config is not None:
+            self.config = config
+
     def _run(self, query: str) -> str:
         try:
-            # Use default config values if no config is passed
-            config = getattr(self, "config", AgentConfig())
+            config = self.config
 
             with DDGS() as ddgs:
                 results = list(

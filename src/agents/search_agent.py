@@ -38,8 +38,8 @@ class SearchAgent:
         # Initialize conversational handler
         self.conversational_handler = ConversationalHandler(llm)
 
-        # Initialize tools
-        all_tools = get_all_tools()
+        # Initialize tools with the agent's config
+        all_tools = get_all_tools(config=self.config)
         self.tools = {tool.name: tool for tool in all_tools}
 
         # Create a mapping from old names to new names for backward compatibility
@@ -482,7 +482,7 @@ Your query: "{query}"'''
             await asyncio.sleep(0.1)
 
             # Stream each search result with attribution
-            for i, search_result in enumerate(search_results):
+            for search_result in search_results:
                 tool_name = search_result.get("tool_name", "Unknown Tool")
                 content = search_result.get("content", "")
 

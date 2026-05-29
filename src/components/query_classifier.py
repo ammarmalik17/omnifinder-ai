@@ -8,19 +8,19 @@ from pydantic import BaseModel, Field
 
 class QueryClassification(BaseModel):
     """Classification of a user query with multi-intent detection and confidence scoring."""
-    
+
     # Intent type: conversational or search-based
     intent_type: Literal["conversational", "search"] = Field(
         ...,
         description="Type of intent: 'conversational' for greetings/small talk, 'search' for knowledge queries"
     )
-    
+
     # Conversational intents (when intent_type is "conversational")
     conversational_intent: Literal["greeting", "small_talk", "thanks", "farewell", "help_request", None] = Field(
         default=None,
         description="Specific conversational intent: greeting (hello/hi), small_talk (how are you), thanks (thank you), farewell (goodbye), help_request (help)"
     )
-    
+
     # Search intents (when intent_type is "search")
     primary_tool: Literal["wikipedia", "arxiv", "web_search", None] = Field(
         default=None,
@@ -30,7 +30,7 @@ class QueryClassification(BaseModel):
         default=[],
         description="Additional search tools that might be helpful (can be empty)"
     )
-    
+
     # Common fields
     reasoning: str = Field(
         ...,
@@ -46,7 +46,7 @@ class QueryClassification(BaseModel):
         default=False,
         description="True if confidence is low (<0.5) or query is ambiguous - should ask clarifying question"
     )
-    
+
     class Config:
         json_schema_extra = {
             "additionalProperties": False
@@ -55,16 +55,16 @@ class QueryClassification(BaseModel):
 
 class QueryClassifier:
     """Classifies user queries to determine appropriate search tools using structured output."""
-    
+
     def __init__(self, llm: ChatOpenRouter):
         self.llm = llm
-        
+
         # Initialize structured output classifier (industry standard approach)
         self.structured_llm = self.llm.with_structured_output(
             QueryClassification,
             method="json_schema"  # Use JSON Schema method for OpenRouter compatibility
         )
-        
+
         # Create the classification prompt
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are an expert at detecting user intent and classifying queries.
@@ -113,18 +113,18 @@ Respond with structured classification including all fields."""),
 
         # Create chain with structured output
         self.chain = self.prompt | self.structured_llm
-    
+
     def classify(self, query: str) -> QueryClassification:
         """Classify a query to determine appropriate search tools.
-        
+
         Uses structured output (industry standard) for type-safe, validated classification.
-        
+
         Args:
             query: The user's query string
-            
+
         Returns:
             QueryClassification object with tool selection, reasoning, and confidence score
-            
+
         Note:
             This method uses structured output which requires model support.
             If the model doesn't support structured output, an error will be raised.
@@ -133,14 +133,14 @@ Respond with structured classification including all fields."""),
         result = self.chain.invoke({"query": query})
         # Structured output returns already-parsed Pydantic model with validation
         return result
-    
+
     async def stream_classify(self, query: str) -> AsyncGenerator[str, None]:
         """
         Stream the classification process with progressive rendering.
-        
+
         Args:
             query: The user's query string
-            
+
         Yields:
             Chunks of the classification reasoning as it's being processed
         """
@@ -148,18 +148,18 @@ Respond with structured classification including all fields."""),
             # Stream the classification reasoning
             yield "🔍 Analyzing query intent...\n\n"
             await asyncio.sleep(0.1)
-            
+
             # Stream the intent detection process
             yield "🧠 Detecting intent type...\n\n"
             await asyncio.sleep(0.1)
-            
+
             # Get the classification result
             classification = self.classify(query)
-            
+
             # Stream the classification details
             yield f"📊 **Intent Type**: {classification.intent_type}\n\n"
             await asyncio.sleep(0.05)
-            
+
             if classification.intent_type == "conversational":
                 yield f"💬 **Conversational Intent**: {classification.conversational_intent}\n\n"
                 yield f"💡 **Reasoning**: {classification.reasoning}\n\n"
@@ -170,11 +170,11 @@ Respond with structured classification including all fields."""),
                     yield f"🔧 **Secondary Tools**: {', '.join(classification.secondary_tools)}\n\n"
                 yield f"💡 **Reasoning**: {classification.reasoning}\n\n"
                 yield f"🎯 **Confidence**: {classification.confidence:.2f}\n\n"
-                
+
                 if classification.needs_clarification:
                     yield "❓ **Note**: Query needs clarification due to low confidence.\n\n"
-            
+
             yield "✅ Classification complete!\n\n"
-            
+
         except Exception as e:
             yield f"❌ Error during classification: {str(e)}"

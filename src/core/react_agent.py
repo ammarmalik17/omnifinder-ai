@@ -360,7 +360,7 @@ Your response should be informative, well-structured, and cite sources when poss
                                 try:
                                     args_str = args_line.split(":", 1)[1].strip()
                                     tool_args = json.loads(args_str)
-                                except:
+                                except Exception:
                                     tool_args = {"query": query}
                             else:
                                 tool_args = {"query": query}

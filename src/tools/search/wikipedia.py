@@ -1,4 +1,5 @@
 import warnings
+from typing import Optional
 
 import wikipedia
 from bs4 import GuessedAtParserWarning
@@ -18,10 +19,17 @@ class WikipediaSearchTool(BaseTool):
         "Search for information on Wikipedia. Use for general knowledge queries."
     )
 
+    config: AgentConfig = AgentConfig()
+
+    def __init__(self, config: Optional[AgentConfig] = None, **kwargs):
+        """Initialize with optional config. Falls back to default AgentConfig."""
+        super().__init__(**kwargs)
+        if config is not None:
+            self.config = config
+
     def _run(self, query: str) -> str:
         try:
-            # Use default config values if no config is passed
-            config = getattr(self, "config", AgentConfig())
+            config = self.config
 
             # Search for pages
             search_results = wikipedia.search(query, results=config.wikipedia_results)
