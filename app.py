@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -6,6 +7,7 @@ from dotenv import load_dotenv
 from src.agents.search_agent import SearchAgent
 from src.config.agent_config import AgentConfig
 from src.core.llm_gateway import (
+    _BENCHMARK_TIMEOUT,
     create_default_llm,
     create_llm_with_model,
     get_llm_gateway,
@@ -56,13 +58,62 @@ if "agent" not in st.session_state:
 with st.sidebar:
     st.header("Configuration")
 
-    # Get models directly from the LLM Gateway
+    # Get models from the LLM Gateway — benchmarked (responsive + sorted by latency)
     gateway = get_llm_gateway()
-    available_models = gateway.get_available_models()
 
+    # Benchmark/refresh button
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.subheader("🤖 LLM Model")
+    with col2:
+        if st.button("🔄", help="Re-benchmark models", use_container_width=True):
+            st.session_state.benchmark_force = True
+
+    # Run benchmark (cached internally; force refresh on button click)
+    force = st.session_state.pop("benchmark_force", False)
+    benchmark_start = time.time()
+    with st.spinner(f"Benchmarking models ({_BENCHMARK_TIMEOUT}s timeout each)..." if force else ""):
+        benchmarked = gateway.benchmark_models(force=force)
+    benchmark_elapsed = time.time() - benchmark_start
+
+    if benchmarked:
+        # Build display labels with latency info
+        model_labels = {
+            m: f"{m}  ⚡{l:.1f}s" for m, l in benchmarked
+        }
+        default_index = 0
+    else:
+        # Fallback: show all available models (unbenchmarked) if benchmark returned nothing
+        fallback_models = gateway.get_available_models()
+        if fallback_models:
+            model_labels = {m: m for m in fallback_models}
+            default_index = 0
+            st.caption("⚠️ Benchmark returned no results. Showing all available models unfiltered.")
+        else:
+            model_labels = {}
+            default_index = None
+            st.warning("No models available. Check your OpenRouter API key.")
+
+    model_ids = list(model_labels.keys())
     model_option = st.selectbox(
-        "Select LLM Model", available_models, index=0 if available_models else None
+        "Select LLM Model",
+        options=model_ids,
+        format_func=lambda m: model_labels.get(m, m),
+        index=default_index if model_ids else None,
     )
+
+    # Show benchmark summary
+    if benchmarked:
+        total = len(gateway.get_available_models())
+        responsive = len(benchmarked)
+        failed = total - responsive
+        st.caption(
+            f"✓ {responsive}/{total} responsive  "
+            f"{' ✗ ' + str(failed) + ' failed' if failed else ''}  "
+            f"({benchmark_elapsed:.1f}s)"
+        )
+    elif fallback_models := gateway.get_available_models():
+        st.caption(f"Showing all {len(fallback_models)} models (benchmark unavailable).")
 
     # Check if model selection has changed and recreate agent if needed
     if model_option and st.session_state.current_model != model_option:

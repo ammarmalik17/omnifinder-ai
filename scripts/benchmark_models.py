@@ -8,7 +8,7 @@ Tests each available free model concurrently using asyncio for:
 import asyncio
 import os
 import time
-from typing import List, Tuple
+from typing import Tuple
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
@@ -43,7 +43,7 @@ async def test_model(
                 timeout=TIMEOUT_SECONDS,
             )
             elapsed = time.perf_counter() - start
-            content = response.choices[0].message.content or ""
+            response.choices[0].message.content or ""
             print(f"✓ {elapsed:.1f}s")
             return model_id, round(elapsed, 2), None
         except Exception as e:
@@ -86,8 +86,8 @@ async def main():
     print("SUMMARY")
     print("=" * 60)
 
-    responsive = [(m, l) for m, l, e in results if l is not None]
-    failed = [(m, e) for m, l, e in results if l is None]
+    responsive = [(m, l) for m, l, e in results if l is not None]  # noqa: E741
+    failed = [(m, e) for m, l, e in results if l is None]  # noqa: E741
 
     responsive.sort(key=lambda x: x[1])  # Sort by latency
 
