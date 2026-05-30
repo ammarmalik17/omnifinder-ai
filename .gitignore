@@ -1,6 +1,7 @@
 venv/
 .env
 .qoder/
+.clinerules/
 __pycache__/
 .vscode/
 ARCHITECTURE.md

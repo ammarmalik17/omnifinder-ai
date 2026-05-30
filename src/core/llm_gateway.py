@@ -8,8 +8,12 @@ model selection, and API key management across the application.
 import os
 from typing import List, Optional
 
+from dotenv import load_dotenv
 from langchain_openrouter import ChatOpenRouter
 from openai import OpenAI
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class LLMGateway:
