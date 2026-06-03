@@ -82,7 +82,7 @@ with st.sidebar:
         }
         default_index = 0
         no_models_available = False
-    elif gateway._last_benchmark_was_fresh:
+    elif getattr(gateway, '_last_benchmark_was_fresh', False):
         # Fresh benchmark ran but returned nothing — likely daily rate limit hit
         model_labels = {}
         default_index = None
