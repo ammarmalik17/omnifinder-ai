@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from backend.agents.search_agent import SearchAgent
 from backend.config.agent_config import AgentConfig
 from backend.core.llm_gateway import (
-    _BENCHMARK_TIMEOUT,
     create_default_llm,
     create_llm_with_model,
     get_llm_gateway,
@@ -82,99 +81,110 @@ with st.sidebar:
             m: f"{m}  ⚡{l:.1f}s" for m, l in benchmarked
         }
         default_index = 0
+        no_models_available = False
+    elif gateway._last_benchmark_was_fresh:
+        # Fresh benchmark ran but returned nothing — likely daily rate limit hit
+        model_labels = {}
+        default_index = None
+        no_models_available = True
+        st.warning("Daily quota exhausted. The system is still smart, just financially grounded.")
     else:
         # Fallback: show all available models (unbenchmarked) if benchmark returned nothing
         fallback_models = gateway.get_available_models()
         if fallback_models:
             model_labels = {m: m for m in fallback_models}
             default_index = 0
+            no_models_available = False
             st.caption("⚠️ Benchmark returned no results. Showing all available models unfiltered.")
         else:
             model_labels = {}
             default_index = None
+            no_models_available = True
             st.warning("No models available. Check your OpenRouter API key.")
 
     model_ids = list(model_labels.keys())
-    model_option = st.selectbox(
-        "Select LLM Model",
-        options=model_ids,
-        format_func=lambda m: model_labels.get(m, m),
-        index=default_index if model_ids else None,
-    )
-
-    # Check if model selection has changed and recreate agent if needed
-    if model_option and st.session_state.current_model != model_option:
-        try:
-            # Create new LLM with the selected model
-            new_llm = create_llm_with_model(model_option)
-
-            # Create new agent configuration
-            agent_config = AgentConfig(
-                max_workers=4,
-                use_react_for_complex=True,
-                max_token_limit=max_history * 300,
-                max_history_messages=max_history,
-            )
-
-            # Create new agent with the new LLM
-            st.session_state.agent = SearchAgent(new_llm, config=agent_config)
-            st.session_state.current_model = model_option
-
-            # Show success message
-            st.success(f"Model switched to: {model_option}")
-
-        except Exception as e:
-            st.error(f"Error switching model: {str(e)}")
-
-    max_history = st.slider("Max History Messages", 5, 20, 10)
-
-    st.divider()
-
-    # Tool and capability toggles in sidebar
-    st.subheader("🔧 Tools & Capabilities")
-    use_wikipedia = st.toggle(
-        "📚 Wikipedia", value=True, help="Search Wikipedia for general knowledge"
-    )
-    use_arxiv = st.toggle(
-        "📄 ArXiv", value=True, help="Search academic papers on ArXiv"
-    )
-    use_web_search = st.toggle(
-        "🌐 Web Search",
-        value=True,
-        help="Search web for current events and general queries",
-    )
-    use_react = st.toggle(
-        "🧠 ReAct Mode",
-        value=True,
-        help="Enable advanced reasoning for complex queries",
-    )
-
-    # Store enabled tools in session state
-    st.session_state.enabled_tools = []
-    if use_wikipedia:
-        st.session_state.enabled_tools.append("wikipedia")
-    if use_arxiv:
-        st.session_state.enabled_tools.append("arxiv")
-    if use_web_search:
-        st.session_state.enabled_tools.append("web_search")
-
-    st.session_state.use_react_mode = use_react
-
-    # Visual indicator of active tools in sidebar
-    if st.session_state.enabled_tools:
-        active_tools_str = " • ".join(
-            [t.replace("_", " ").title() for t in st.session_state.enabled_tools]
+    if not no_models_available:
+        model_option = st.selectbox(
+            "Select LLM Model",
+            options=model_ids,
+            format_func=lambda m: model_labels.get(m, m),
+            index=default_index if model_ids else None,
         )
-        if st.session_state.use_react_mode:
-            active_tools_str += " • 🧠 ReAct"
-        st.caption(f"Active: {active_tools_str}")
 
-    st.divider()
+        # Check if model selection has changed and recreate agent if needed
+        if model_option and st.session_state.current_model != model_option:
+            try:
+                # Create new LLM with the selected model
+                new_llm = create_llm_with_model(model_option)
 
-    if st.button("Clear Chat History"):
-        st.session_state.messages = []
-        st.session_state.agent.clear_conversation()
-        st.rerun()
+                # Create new agent configuration
+                agent_config = AgentConfig(
+                    max_workers=4,
+                    use_react_for_complex=True,
+                    max_token_limit=max_history * 300,
+                    max_history_messages=max_history,
+                )
+
+                # Create new agent with the new LLM
+                st.session_state.agent = SearchAgent(new_llm, config=agent_config)
+                st.session_state.current_model = model_option
+
+                # Show success message
+                st.success(f"Model switched to: {model_option}")
+
+            except Exception as e:
+                st.error(f"Error switching model: {str(e)}")
+
+    if not no_models_available:
+        max_history = st.slider("Max History Messages", 5, 20, 10)
+
+        st.divider()
+
+        # Tool and capability toggles in sidebar
+        st.subheader("🔧 Tools & Capabilities")
+        use_wikipedia = st.toggle(
+            "📚 Wikipedia", value=True, help="Search Wikipedia for general knowledge"
+        )
+        use_arxiv = st.toggle(
+            "📄 ArXiv", value=True, help="Search academic papers on ArXiv"
+        )
+        use_web_search = st.toggle(
+            "🌐 Web Search",
+            value=True,
+            help="Search web for current events and general queries",
+        )
+        use_react = st.toggle(
+            "🧠 ReAct Mode",
+            value=True,
+            help="Enable advanced reasoning for complex queries",
+        )
+
+        # Store enabled tools in session state
+        st.session_state.enabled_tools = []
+        if use_wikipedia:
+            st.session_state.enabled_tools.append("wikipedia")
+        if use_arxiv:
+            st.session_state.enabled_tools.append("arxiv")
+        if use_web_search:
+            st.session_state.enabled_tools.append("web_search")
+
+        st.session_state.use_react_mode = use_react
+
+        # Visual indicator of active tools in sidebar
+        if st.session_state.enabled_tools:
+            active_tools_str = " • ".join(
+                [t.replace("_", " ").title() for t in st.session_state.enabled_tools]
+            )
+            if st.session_state.use_react_mode:
+                active_tools_str += " • 🧠 ReAct"
+            st.caption(f"Active: {active_tools_str}")
+
+        st.divider()
+
+        if st.button("Clear Chat History"):
+            st.session_state.messages = []
+            st.session_state.agent.clear_conversation()
+            st.rerun()
 
 # Get the agent from session state
 agent = st.session_state.agent
@@ -185,7 +195,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # Chat input
-if prompt := st.chat_input("Ask me anything..."):
+if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
     # Add user message to session state
     st.session_state.messages.append({"role": "user", "content": prompt})
     # Note: The agent will handle adding messages to its internal memory

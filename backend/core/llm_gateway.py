@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from langchain_openrouter import ChatOpenRouter
 from openai import OpenAI
 
-from .benchmark import _BENCHMARK_TIMEOUT, run_benchmark_sync
+from .benchmark import run_benchmark_sync
 
 # Load environment variables from .env file
 load_dotenv()
@@ -41,6 +41,7 @@ class LLMGateway:
         self._available_models = None
         self._benchmark_results = None  # (timestamp, [(model_id, latency), ...])
         self._benchmark_in_progress = False
+        self._last_benchmark_was_fresh = False
 
     @property
     def client(self) -> OpenAI:
@@ -176,10 +177,12 @@ class LLMGateway:
         if not force and self._benchmark_results is not None:
             cached_time, cached_data = self._benchmark_results
             if now - cached_time < _BENCHMARK_CACHE_TTL:
+                self._last_benchmark_was_fresh = False
                 return cached_data
 
         # Guard against concurrent benchmark calls
         if self._benchmark_in_progress:
+            self._last_benchmark_was_fresh = False
             if self._benchmark_results is not None:
                 return self._benchmark_results[1]
             return []
@@ -195,6 +198,7 @@ class LLMGateway:
 
             # Cache and return
             self._benchmark_results = (now, results)
+            self._last_benchmark_was_fresh = True
             return results
         finally:
             self._benchmark_in_progress = False
