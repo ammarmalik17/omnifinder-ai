@@ -1,12 +1,5 @@
 import asyncio
-import os
-import sys
 import time
-
-# Add project root to sys.path so 'backend' package can be found
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 import streamlit as st
 from dotenv import load_dotenv
