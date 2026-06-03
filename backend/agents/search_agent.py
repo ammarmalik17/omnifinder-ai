@@ -7,14 +7,14 @@ from typing import Any, AsyncGenerator, Dict, List
 from langchain_core.messages import BaseMessage
 from langchain_openrouter import ChatOpenRouter
 
-from src.components.conversational_handler import ConversationalHandler
-from src.components.query_classifier import QueryClassifier
-from src.components.result_synthesizer import ResultSynthesizer
-from src.config.agent_config import AgentConfig
-from src.core.react_agent import create_omnifinder_react_agent
-from src.memory.conversation import ConversationBufferWindowMemory
-from src.tools.search import get_all_tools
-from src.utils.logger import AgentLogger
+from backend.components.conversational_handler import ConversationalHandler
+from backend.components.query_classifier import QueryClassifier
+from backend.components.result_synthesizer import ResultSynthesizer
+from backend.config.agent_config import AgentConfig
+from backend.core.react_agent import create_omnifinder_react_agent
+from backend.memory.conversation import ConversationBufferWindowMemory
+from backend.tools.search import get_all_tools
+from backend.utils.logger import AgentLogger
 
 
 class SearchAgent:

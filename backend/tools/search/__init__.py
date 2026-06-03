@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from langchain_core.tools import BaseTool
 
-from src.config.agent_config import AgentConfig
+from backend.config.agent_config import AgentConfig
 
 from .arxiv import ArxivSearchTool
 from .web_search import WebSearchTool

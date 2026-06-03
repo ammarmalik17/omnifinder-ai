@@ -83,7 +83,7 @@ To get a free OpenRouter API key:
 ### Step 5: Run the Application
 
 ```bash
-streamlit run app.py
+streamlit run frontend/app.py
 ```
 
 The application will open in your default web browser at `http://localhost:8501`
@@ -182,7 +182,7 @@ graph TB
 
 ### Agent Configuration
 
-Edit `src/config/agent_config.py` to customize:
+Edit `backend/config/agent_config.py` to customize:
 
 ```python
 AgentConfig(
@@ -242,7 +242,7 @@ Contributions are welcome! Here's how to get started:
 
 1. Follow PEP 8 style guidelines
 2. Add docstrings to functions and classes
-3. Test your changes locally with `streamlit run app.py`
+3. Test your changes locally with `streamlit run frontend/app.py`
 4. Ensure the application runs without errors
 
 ### Submitting Changes
@@ -306,14 +306,14 @@ Contributions are welcome! Here's how to get started:
 
 To add a new search tool:
 
-1. Create a new tool class in `src/tools/search_tools.py` inheriting from `BaseTool`
+1. Create a new tool class in `backend/tools/search/` inheriting from `BaseTool`
 2. Implement the `_run()` method
 3. Add to `get_all_tools()` function
 4. Register in `AgentConfig.enabled_tools`
 
 ### Custom Query Classifiers
 
-Modify the query classification logic in `src/components/query_classifier.py` to:
+Modify the query classification logic in `backend/components/query_classifier.py` to:
 
 - Add domain-specific classification rules
 - Adjust tool priority weights
@@ -321,7 +321,7 @@ Modify the query classification logic in `src/components/query_classifier.py` to
 
 ### Extending Result Synthesis
 
-Enhance `src/components/result_synthesizer.py` to:
+Enhance `backend/components/result_synthesizer.py` to:
 
 - Create custom formatting for results
 - Add source attribution

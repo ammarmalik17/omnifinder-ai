@@ -1,6 +1,6 @@
 """Memory module for conversation management."""
 
-from src.memory.conversation import (
+from backend.memory.conversation import (
     ConversationBufferWindowMemory,
     ConversationSummaryMemory,
 )

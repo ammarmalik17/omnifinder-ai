@@ -3,7 +3,7 @@ from typing import Optional
 from ddgs import DDGS
 from langchain_core.tools import BaseTool
 
-from src.config.agent_config import AgentConfig
+from backend.config.agent_config import AgentConfig
 
 
 class WebSearchTool(BaseTool):

@@ -1,12 +1,19 @@
 import asyncio
+import os
+import sys
 import time
+
+# Add project root to sys.path so 'backend' package can be found
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 import streamlit as st
 from dotenv import load_dotenv
 
-from src.agents.search_agent import SearchAgent
-from src.config.agent_config import AgentConfig
-from src.core.llm_gateway import (
+from backend.agents.search_agent import SearchAgent
+from backend.config.agent_config import AgentConfig
+from backend.core.llm_gateway import (
     _BENCHMARK_TIMEOUT,
     create_default_llm,
     create_llm_with_model,
@@ -72,7 +79,7 @@ with st.sidebar:
     # Run benchmark (cached internally; force refresh on button click)
     force = st.session_state.pop("benchmark_force", False)
     benchmark_start = time.time()
-    with st.spinner(f"Benchmarking models ({_BENCHMARK_TIMEOUT}s timeout each)..." if force else ""):
+    with st.spinner("Fetching Models..."):
         benchmarked = gateway.benchmark_models(force=force)
     benchmark_elapsed = time.time() - benchmark_start
 
@@ -101,19 +108,6 @@ with st.sidebar:
         format_func=lambda m: model_labels.get(m, m),
         index=default_index if model_ids else None,
     )
-
-    # Show benchmark summary
-    if benchmarked:
-        total = len(gateway.get_available_models())
-        responsive = len(benchmarked)
-        failed = total - responsive
-        st.caption(
-            f"✓ {responsive}/{total} responsive  "
-            f"{' ✗ ' + str(failed) + ' failed' if failed else ''}  "
-            f"({benchmark_elapsed:.1f}s)"
-        )
-    elif fallback_models := gateway.get_available_models():
-        st.caption(f"Showing all {len(fallback_models)} models (benchmark unavailable).")
 
     # Check if model selection has changed and recreate agent if needed
     if model_option and st.session_state.current_model != model_option:

@@ -7,7 +7,6 @@ model selection, and API key management across the application.
 
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional, Tuple
 
 import httpx
@@ -15,20 +14,13 @@ from dotenv import load_dotenv
 from langchain_openrouter import ChatOpenRouter
 from openai import OpenAI
 
+from .benchmark import _BENCHMARK_TIMEOUT, run_benchmark_sync
+
 # Load environment variables from .env file
 load_dotenv()
 
 # Number of seconds before benchmark results are considered stale
 _BENCHMARK_CACHE_TTL = 300  # 5 minutes
-
-# How many concurrent benchmark requests to allow (avoid rate-limit spikes)
-_BENCHMARK_MAX_CONCURRENT = 5
-
-# Simple prompt for benchmarking (must be fast to generate)
-_BENCHMARK_PROMPT = "Say exactly: ok"
-
-# Timeout per model (seconds) — short, we're just testing "Say exactly: ok"
-_BENCHMARK_TIMEOUT = 8
 
 
 class LLMGateway:
@@ -199,71 +191,13 @@ class LLMGateway:
                 self._benchmark_results = (now, [])
                 return []
 
-            results = self._run_benchmark_sync(models)
+            results = run_benchmark_sync(self.api_key, models)
 
             # Cache and return
             self._benchmark_results = (now, results)
             return results
         finally:
             self._benchmark_in_progress = False
-
-    def _run_benchmark_sync(
-        self, models: List[str]
-    ) -> List[Tuple[str, float]]:
-        """
-        Benchmark a list of models concurrently using ThreadPoolExecutor.
-
-        Args:
-            models: List of model IDs to test.
-
-        Returns:
-            List of (model_id, latency) for responsive models, sorted by latency.
-        """
-        client = self.client  # Get the shared sync client
-        total = len(models)
-        responsive = []
-        completed = 0
-        lock = __import__("threading").Lock()
-
-        def test_single(model_id: str) -> Optional[Tuple[str, float]]:
-            """Test a single model. Returns None if it fails."""
-            try:
-                start = time.perf_counter()
-                response = client.chat.completions.create(
-                    model=model_id,
-                    messages=[{"role": "user", "content": _BENCHMARK_PROMPT}],
-                    max_tokens=10,
-                    temperature=0,
-                    timeout=_BENCHMARK_TIMEOUT,
-                )
-                elapsed = time.perf_counter() - start
-                # Confirm we actually got text back
-                if response.choices and response.choices[0].message.content:
-                    return (model_id, round(elapsed, 2))
-                return None
-            except Exception:
-                return None
-
-        print(f"\n[Benchmark] Testing {total} models (max {_BENCHMARK_MAX_CONCURRENT} concurrent)...")
-
-        with ThreadPoolExecutor(max_workers=_BENCHMARK_MAX_CONCURRENT) as executor:
-            future_to_model = {
-                executor.submit(test_single, m): m for m in models
-            }
-            for future in as_completed(future_to_model):
-                completed += 1
-                result = future.result()
-                if result is not None:
-                    with lock:
-                        responsive.append(result)
-                    print(f"[Benchmark] ✓ {result[0]:<55} {result[1]:.1f}s  ({completed}/{total})")
-                else:
-                    print(f"[Benchmark] ✗ {future_to_model[future]:<55} failed     ({completed}/{total})")
-
-        # Sort by latency (fastest first)
-        responsive.sort(key=lambda x: x[1])
-        print(f"[Benchmark] Done — {len(responsive)}/{total} responsive, fastest: {responsive[0][0] if responsive else 'N/A'} ({responsive[0][1]:.1f}s)" if responsive else f"[Benchmark] Done — 0/{total} responsive")
-        return responsive
 
     def get_benchmarked_models(self) -> List[str]:
         """

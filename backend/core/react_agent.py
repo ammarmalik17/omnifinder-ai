@@ -15,7 +15,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from langchain_openrouter import ChatOpenRouter
 
-from src.utils.logger import AgentLogger
+from backend.utils.logger import AgentLogger
 
 
 class ReActSearchAgent:

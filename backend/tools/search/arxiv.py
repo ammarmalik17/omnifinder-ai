@@ -3,7 +3,7 @@ from typing import Optional
 import arxiv
 from langchain_core.tools import BaseTool
 
-from src.config.agent_config import AgentConfig
+from backend.config.agent_config import AgentConfig
 
 
 class ArxivSearchTool(BaseTool):

@@ -5,7 +5,7 @@ import wikipedia
 from bs4 import GuessedAtParserWarning
 from langchain_core.tools import BaseTool
 
-from src.config.agent_config import AgentConfig
+from backend.config.agent_config import AgentConfig
 
 # Suppress the BeautifulSoup warning about parser guessing
 warnings.filterwarnings("ignore", category=GuessedAtParserWarning)
