@@ -13,8 +13,9 @@ from typing import List, Optional, Tuple
 
 import httpx
 
-# How many concurrent benchmark requests to allow (avoid rate-limit spikes)
-_BENCHMARK_MAX_CONCURRENT = 15
+# How many concurrent benchmark requests to allow — kept low to avoid
+# triggering OpenRouter's free-tier rate limits (50 requests/day total).
+_BENCHMARK_MAX_CONCURRENT = 3
 
 # Simple prompt for benchmarking (must be fast to generate)
 _BENCHMARK_PROMPT = "Say exactly: ok"
