@@ -1,24 +1,17 @@
-from typing import Optional
-
 import arxiv
 from langchain_core.tools import BaseTool
 
 from backend.config.agent_config import AgentConfig
+from backend.tools.search import BaseSearchTool
 
 
-class ArxivSearchTool(BaseTool):
+class ArxivSearchTool(BaseSearchTool):
     """Tool for searching academic papers on Arxiv."""
 
     name: str = "arxiv"
     description: str = "Search for academic papers on Arxiv. Use for research papers and academic queries."
 
     config: AgentConfig = AgentConfig()
-
-    def __init__(self, config: Optional[AgentConfig] = None, **kwargs):
-        """Initialize with optional config. Falls back to default AgentConfig."""
-        super().__init__(**kwargs)
-        if config is not None:
-            self.config = config
 
     def _run(self, query: str) -> str:
         try:

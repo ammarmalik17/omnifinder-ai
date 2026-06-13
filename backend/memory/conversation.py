@@ -17,49 +17,15 @@ from langchain_core.language_models import BaseChatModel
 logger = logging.getLogger(__name__)
 
 
-class ConversationBufferWindowMemory:
-    """Manages conversation history with a sliding window to stay within token limits."""
+class TokenCountMixin:
+    """Mixin providing token counting utilities for conversation memory classes.
 
-    def __init__(
-        self,
-        llm: BaseChatModel,
-        max_token_limit: int = 3000,
-        max_history_messages: int = 10,
-    ):
-        self.llm = llm
-        self.max_token_limit = max_token_limit
-        self.max_history_messages = max_history_messages
-        self.messages: List[BaseMessage] = []
-        self.token_encoder = tiktoken.get_encoding("cl100k_base")
-        self._lock = threading.RLock()
-        self._token_cache: Dict[int, int] = {}  # Cache token counts by message id
-
-    def __len__(self) -> int:
-        """Return the number of messages in the conversation."""
-        with self._lock:
-            return len(self.messages)
-
-    def add_message(self, message: BaseMessage):
-        """Add a message to the conversation history."""
-        with self._lock:
-            self.messages.append(message)
-            # Cache token count for new message
-            self._cache_message_tokens(message)
-            # Trim messages if needed to stay within limits
-            self._trim_messages()
-
-    def add_user_message(self, content: str):
-        """Add a user message to the conversation."""
-        self.add_message(HumanMessage(content=content))
-
-    def add_ai_message(self, content: str):
-        """Add an AI message to the conversation."""
-        self.add_message(AIMessage(content=content))
-
-    def get_messages(self) -> List[BaseMessage]:
-        """Get the current conversation history."""
-        with self._lock:
-            return self.messages.copy()
+    Both ConversationBufferWindowMemory and ConversationSummaryMemory require
+    identical token-counting logic. This mixin avoids duplicating those methods.
+    Classes using this mixin must define:
+        - self.token_encoder (tiktoken.Encoding)
+        - self._token_cache (Dict[int, int])
+    """
 
     def _cache_message_tokens(self, message: BaseMessage):
         """Cache token count for a message."""
@@ -92,6 +58,51 @@ class ConversationBufferWindowMemory:
                 return len(self.token_encoder.encode(content_str))
             except Exception:
                 return len(str(content))
+
+    def add_user_message(self, content: str):
+        """Add a user message to the conversation."""
+        self.add_message(HumanMessage(content=content))
+
+    def add_ai_message(self, content: str):
+        """Add an AI message to the conversation."""
+        self.add_message(AIMessage(content=content))
+
+
+class ConversationBufferWindowMemory(TokenCountMixin):
+    """Manages conversation history with a sliding window to stay within token limits."""
+
+    def __init__(
+        self,
+        llm: BaseChatModel,
+        max_token_limit: int = 3000,
+        max_history_messages: int = 10,
+    ):
+        self.llm = llm
+        self.max_token_limit = max_token_limit
+        self.max_history_messages = max_history_messages
+        self.messages: List[BaseMessage] = []
+        self.token_encoder = tiktoken.get_encoding("cl100k_base")
+        self._lock = threading.RLock()
+        self._token_cache: Dict[int, int] = {}  # Cache token counts by message id
+
+    def __len__(self) -> int:
+        """Return the number of messages in the conversation."""
+        with self._lock:
+            return len(self.messages)
+
+    def add_message(self, message: BaseMessage):
+        """Add a message to the conversation history."""
+        with self._lock:
+            self.messages.append(message)
+            # Cache token count for new message
+            self._cache_message_tokens(message)
+            # Trim messages if needed to stay within limits
+            self._trim_messages()
+
+    def get_messages(self) -> List[BaseMessage]:
+        """Get the current conversation history."""
+        with self._lock:
+            return self.messages.copy()
 
     def _trim_messages(self):
         """Trim messages to stay within token and message count limits."""
@@ -161,7 +172,7 @@ class ConversationBufferWindowMemory:
             self._token_cache.clear()
 
 
-class ConversationSummaryMemory:
+class ConversationSummaryMemory(TokenCountMixin):
     """Maintains conversation history by summarizing older interactions."""
 
     # Number of recent messages to keep as buffer (not summarized)
@@ -232,14 +243,6 @@ class ConversationSummaryMemory:
         """
         asyncio.run(self.aadd_message(message))
 
-    def add_user_message(self, content: str):
-        """Add a user message to the conversation."""
-        self.add_message(HumanMessage(content=content))
-
-    def add_ai_message(self, content: str):
-        """Add an AI message to the conversation."""
-        self.add_message(AIMessage(content=content))
-
     def get_messages(self) -> List[BaseMessage]:
         """Get the current conversation history with summary if applicable."""
         with self._lock:
@@ -257,38 +260,6 @@ class ConversationSummaryMemory:
             result.extend(self.recent_messages)
 
             return result
-
-    def _cache_message_tokens(self, message: BaseMessage):
-        """Cache token count for a message."""
-        msg_id = id(message)
-        if msg_id not in self._token_cache:
-            self._token_cache[msg_id] = self._count_message_tokens(message)
-
-    def _count_message_tokens(self, message: BaseMessage) -> int:
-        """Count tokens for a single message."""
-        content = message.content
-        if isinstance(content, str):
-            try:
-                return len(self.token_encoder.encode(content))
-            except Exception:
-                return len(content)
-        elif isinstance(content, list):
-            total = 0
-            for item in content:
-                if isinstance(item, str):
-                    try:
-                        total += len(self.token_encoder.encode(item))
-                    except Exception:
-                        total += len(item)
-            return total
-        elif content is None:
-            return 0
-        else:
-            try:
-                content_str = str(content)
-                return len(self.token_encoder.encode(content_str))
-            except Exception:
-                return len(str(content))
 
     async def _create_summary_async(self):
         """Create a summary of the earlier messages asynchronously."""

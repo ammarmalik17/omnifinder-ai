@@ -57,18 +57,14 @@ async def _test_single_model(
         elapsed = time.perf_counter() - start
 
         if response.status_code != 200:
-            body = response.text[:200]
-            print(f"[Benchmark] ⚠ {model_id:<55} HTTP {response.status_code} — {body}")
             return None
 
         data = response.json()
         if data.get("choices") and data["choices"][0].get("message", {}).get("content"):
             return (model_id, round(elapsed, 2))
 
-        print(f"[Benchmark] ⚠ {model_id:<55} unexpected response shape: {str(data)[:150]}")
         return None
     except Exception as e:
-        print(f"[Benchmark] ⚠ {model_id:<55} exception: {e}")
         return None
 
 
@@ -112,22 +108,11 @@ async def run_benchmark_async(
 
         # Create all tasks
         tasks = {asyncio.create_task(bounded_test(m)): m for m in models}
-        completed = 0
 
         for future in asyncio.as_completed(tasks):
-            completed += 1
             model_id, result = await future
             if result is not None:
                 responsive.append(result)
-                print(
-                    f"[Benchmark] ✓ {result[0]:<55} "
-                    f"{result[1]:.1f}s  ({completed}/{total})"
-                )
-            else:
-                print(
-                    f"[Benchmark] ✗ {model_id:<55} "
-                    f"failed     ({completed}/{total})"
-                )
 
     responsive.sort(key=lambda x: x[1])
     if responsive:

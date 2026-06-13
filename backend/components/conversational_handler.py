@@ -7,8 +7,9 @@ without triggering unnecessary web searches.
 
 from typing import Any, Dict
 
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models import BaseChatModel
+
+from backend.prompts import conversational_prompt
 
 
 class ConversationalHandler:
@@ -16,40 +17,7 @@ class ConversationalHandler:
 
     def __init__(self, llm: BaseChatModel):
         self.llm = llm
-        self.prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    """You are OmniFinder AI, a friendly and helpful search assistant.
-
-Respond naturally and conversationally to the user's message.
-
-For **greetings** (hello, hi, good morning):
-- Respond warmly and offer assistance
-- Example: "Hello! How can I help you today?"
-
-For **small talk** (how are you, what's up):
-- Respond briefly and pivot to offering help
-- Example: "I'm doing well, thank you! Is there anything I can help you with?"
-
-For **thanks** (thank you, thanks):
-- Acknowledge graciously and offer further assistance
-- Example: "You're welcome! Feel free to ask if you need anything else."
-
-For **farewells** (goodbye, bye):
-- Respond politely and invite return
-- Example: "Goodbye! Have a great day and come back anytime!"
-
-For **help requests** (can you help me):
-- Express willingness to help and ask for specifics
-- Example: "Of course! I'd be happy to help. What would you like assistance with?"
-
-Keep responses concise, friendly, and natural. Avoid being overly verbose.""",
-                ),
-                ("human", "{message}"),
-            ]
-        )
-        self.chain = self.prompt | self.llm
+        self.chain = conversational_prompt | self.llm
 
     def handle(self, intent_type: str, query: str) -> Dict[str, Any]:
         """Generate appropriate conversational response.

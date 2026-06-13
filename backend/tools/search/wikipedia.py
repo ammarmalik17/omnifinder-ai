@@ -1,17 +1,18 @@
 import warnings
-from typing import Optional
 
 import wikipedia
 from bs4 import GuessedAtParserWarning
 from langchain_core.tools import BaseTool
 
 from backend.config.agent_config import AgentConfig
+from backend.tools.search import BaseSearchTool
+
 
 # Suppress the BeautifulSoup warning about parser guessing
 warnings.filterwarnings("ignore", category=GuessedAtParserWarning)
 
 
-class WikipediaSearchTool(BaseTool):
+class WikipediaSearchTool(BaseSearchTool):
     """Tool for searching Wikipedia."""
 
     name: str = "wikipedia"
@@ -20,12 +21,6 @@ class WikipediaSearchTool(BaseTool):
     )
 
     config: AgentConfig = AgentConfig()
-
-    def __init__(self, config: Optional[AgentConfig] = None, **kwargs):
-        """Initialize with optional config. Falls back to default AgentConfig."""
-        super().__init__(**kwargs)
-        if config is not None:
-            self.config = config
 
     def _run(self, query: str) -> str:
         try:
