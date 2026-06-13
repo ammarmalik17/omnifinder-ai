@@ -13,6 +13,8 @@ from backend.components.result_synthesizer import ResultSynthesizer
 from backend.config.agent_config import AgentConfig
 from backend.core.react_agent import create_omnifinder_react_agent
 from backend.memory.conversation import ConversationBufferWindowMemory
+from backend.schemas.agent_response import AgentResponse
+from backend.schemas.result import ToolResponse
 from backend.tools.search import get_all_tools
 from backend.utils.logger import AgentLogger
 
@@ -62,7 +64,7 @@ class SearchAgent:
 
     def process_query(
         self, query: str, enabled_tools: List[str] = None, use_react: bool = None
-    ) -> Dict[str, Any]:
+    ) -> AgentResponse:
         """
         Process a user query through the full pipeline with intent detection.
 
@@ -141,7 +143,7 @@ class SearchAgent:
 
     def _handle_conversational_intent(
         self, query: str, classification
-    ) -> Dict[str, Any]:
+    ) -> AgentResponse:
         """Handle conversational intents without search.
 
         Args:
@@ -149,7 +151,7 @@ class SearchAgent:
             classification: Classification result with conversational intent
 
         Returns:
-            Dictionary with conversational response
+            AgentResponse with conversational response
         """
         # Use handler to generate appropriate response
         response_data = self.conversational_handler.handle(
@@ -161,16 +163,15 @@ class SearchAgent:
             self.memory.add_user_message(query)
             self.memory.add_ai_message(response_data["response"])
 
-        return {
-            "query": query,
-            "classification": classification,
-            "search_results": [],
-            "synthesized_answer": response_data["response"],
-            "conversational": True,
-            "intent_handled": classification.conversational_intent,
-        }
+        return AgentResponse(
+            query=query,
+            classification=classification,
+            synthesized_answer=response_data["response"],
+            conversational=True,
+            intent_handled=classification.conversational_intent,
+        )
 
-    def _handle_low_confidence(self, query: str, classification) -> Dict[str, Any]:
+    def _handle_low_confidence(self, query: str, classification) -> AgentResponse:
         """Handle low confidence queries by asking for clarification.
 
         Args:
@@ -178,7 +179,7 @@ class SearchAgent:
             classification: Classification result with low confidence
 
         Returns:
-            Dictionary with clarifying question
+            AgentResponse with clarifying question
         """
         clarification_response = f'''I want to make sure I understand your question correctly.
 
@@ -194,17 +195,16 @@ Your query: "{query}"'''
             self.memory.add_user_message(query)
             self.memory.add_ai_message(clarification_response)
 
-        return {
-            "query": query,
-            "classification": classification,
-            "search_results": [],
-            "synthesized_answer": clarification_response,
-            "needs_clarification": True,
-        }
+        return AgentResponse(
+            query=query,
+            classification=classification,
+            synthesized_answer=clarification_response,
+            needs_clarification=True,
+        )
 
     def _process_search_query(
         self, query: str, classification, enabled_tools: List[str] = None
-    ) -> Dict[str, Any]:
+    ) -> AgentResponse:
         """Process a search query through tool execution and synthesis.
 
         Args:
@@ -213,7 +213,7 @@ Your query: "{query}"'''
             enabled_tools: List of enabled tools
 
         Returns:
-            Dictionary with search results and synthesized answer
+            AgentResponse with search results and synthesized answer
         """
         # Determine which tools to use based on classification and enabled_tools filter
         tools_to_use = (
@@ -265,12 +265,12 @@ Your query: "{query}"'''
         # End query timing
         self.logger.end_query_timing(success=True)
 
-        return {
-            "query": query,
-            "classification": classification,
-            "search_results": search_results,
-            "synthesized_answer": synthesized_answer,
-        }
+        return AgentResponse(
+            query=query,
+            classification=classification,
+            search_results=search_results,
+            synthesized_answer=synthesized_answer,
+        )
 
     def _is_complex_query(self, query: str, classification) -> bool:
         """
@@ -302,7 +302,7 @@ Your query: "{query}"'''
 
         return False
 
-    def _process_with_react(self, query: str, classification=None) -> Dict[str, Any]:
+    def _process_with_react(self, query: str, classification=None) -> AgentResponse:
         """
         Process a query using the ReAct agent for complex reasoning.
 
@@ -311,7 +311,7 @@ Your query: "{query}"'''
             classification: Optional classification result (for sub_queries)
 
         Returns:
-            Dictionary containing the response from the ReAct agent
+            AgentResponse containing the response from the ReAct agent
         """
         sub_queries = None
         if classification and hasattr(classification, "is_compound") and classification.is_compound:
@@ -319,19 +319,16 @@ Your query: "{query}"'''
 
         react_result = self.react_agent.process_query(query, sub_queries=sub_queries)
 
-        # Format the result to match the expected return format
-        return {
-            "query": query,
-            "classification": None,  # Not applicable for ReAct
-            "search_results": [],  # Results are handled within ReAct
-            "synthesized_answer": react_result["final_answer"],
-            "react_steps": react_result["steps"],  # Include steps for transparency
-            "react_iterations": react_result["iterations"],
-        }
+        return AgentResponse(
+            query=query,
+            synthesized_answer=react_result["final_answer"],
+            react_steps=react_result["steps"],
+            react_iterations=react_result["iterations"],
+        )
 
     def _execute_search_tools(
         self, query: str, tools_to_use: List[str]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[ToolResponse]:
         """
         Execute search tools concurrently to improve performance.
 
@@ -340,7 +337,7 @@ Your query: "{query}"'''
             tools_to_use: List of tool names to execute
 
         Returns:
-            List of results from each tool
+            List of ToolResponse from each tool
         """
         search_results = []
         tool_timings = {}
@@ -367,12 +364,24 @@ Your query: "{query}"'''
                 try:
                     result = future.result()
                     self.logger.log_tool_result(tool_name, tool_duration, len(result))
-                    search_results.append({"tool_name": tool_name, "content": result})
+                    search_results.append(
+                        ToolResponse(
+                            tool_name=tool_name,
+                            content=result,
+                            execution_time=tool_duration,
+                        )
+                    )
                 except Exception as e:
                     self.logger.log_tool_error(tool_name, str(e), tool_duration)
                     error_msg = f"Error with {tool_name}: {str(e)}"
                     search_results.append(
-                        {"tool_name": tool_name, "content": error_msg}
+                        ToolResponse(
+                            tool_name=tool_name,
+                            content=error_msg,
+                            success=False,
+                            error=str(e),
+                            execution_time=tool_duration,
+                        )
                     )
 
         return search_results
@@ -454,10 +463,10 @@ Your query: "{query}"'''
         result = self.process_query(
             query, enabled_tools=enabled_tools, use_react=use_react
         )
-        return result["synthesized_answer"]
+        return result.synthesized_answer
 
     async def stream_synthesized_answer(
-        self, query: str, result: Dict[str, Any]
+        self, query: str, result: AgentResponse
     ) -> AsyncGenerator[str, None]:
         """
         Stream the synthesized answer using real LLM token streaming.
@@ -467,15 +476,15 @@ Your query: "{query}"'''
 
         Args:
             query: The user's query
-            result: The result from process_query
+            result: The AgentResponse from process_query
 
         Yields:
             Chunks of the synthesized answer as they become available
         """
         try:
             # For conversational responses, stream directly (pre-generated text)
-            if result.get("conversational"):
-                response = result["synthesized_answer"]
+            if result.conversational:
+                response = result.synthesized_answer
                 for i in range(0, len(response), 3):
                     chunk = response[i : i + 3]
                     yield chunk
@@ -483,17 +492,17 @@ Your query: "{query}"'''
                 return
 
             # For search results, stream from the synthesizer's real LLM streaming
-            search_results = result.get("search_results", [])
+            search_results = result.search_results
             if not search_results:
-                yield result.get("synthesized_answer", "")
+                yield result.synthesized_answer
                 return
 
             # Stream initial banner, then delegate to real LLM token streaming
-            yield "🔍 Analyzing search results...\n\n"
+            yield "\U0001f50d Analyzing search results...\n\n"
             async for chunk in self.result_synthesizer.stream_synthesize_async(
                 query, search_results
             ):
                 yield chunk
 
         except Exception as e:
-            yield f"❌ Error during streaming: {str(e)}"
+            yield f"\u274c Error during streaming: {str(e)}"

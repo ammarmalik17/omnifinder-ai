@@ -212,7 +212,7 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
                     enabled_tools=st.session_state.enabled_tools,
                     use_react=st.session_state.use_react_mode,
                 )
-                synthesized_answer = result["synthesized_answer"]
+                synthesized_answer = result.synthesized_answer
 
                 print("\n✓ Query processed successfully")
                 print(
@@ -220,17 +220,17 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
                 )
 
                 # Print detailed timing summary if available
-                if "react_iterations" in result:
-                    print(f"ReAct iterations: {result['react_iterations']}")
-                if "classification" in result and result["classification"]:
-                    cls = result["classification"]
+                if result.react_iterations is not None:
+                    print(f"ReAct iterations: {result.react_iterations}")
+                if result.classification is not None:
+                    cls = result.classification
                     print(f"Primary tool: {cls.primary_tool}")
                     if cls.secondary_tools:
                         print(f"Secondary tools: {', '.join(cls.secondary_tools)}")
                     print(f"Confidence: {cls.confidence:.2f}")
 
                 # Check if ReAct was used (indicated by presence of react_steps)
-                if "react_steps" in result:
+                if result.react_steps:
                     # Show ReAct steps for complex queries
                     with st.expander("🧠 ReAct Reasoning Process", expanded=True):
                         st.write(
@@ -240,7 +240,7 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
                             "This approach dynamically reasons and acts with tools to find answers."
                         )
 
-                        steps = result.get("react_steps", [])
+                        steps = result.react_steps
                         for step in steps:
                             if step["action"] == "tool_call":
                                 with st.container():
@@ -269,8 +269,8 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
                                     )
                 else:
                     # Show the classification process (traditional approach)
-                    classification = result["classification"]
-                    search_results = result["search_results"]
+                    classification = result.classification
+                    search_results = result.search_results
 
                     with st.expander("🔍 Query Classification", expanded=True):
                         st.write(f"**Primary Tool:** {classification.primary_tool}")
@@ -284,12 +284,8 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
                     if search_results:
                         with st.expander("📊 Search Results", expanded=True):
                             for i, search_result in enumerate(search_results):
-                                tool_name = search_result.get(
-                                    "tool_name", "Unknown Tool"
-                                )
-                                content = search_result.get(
-                                    "content", "No content returned"
-                                )
+                                tool_name = search_result.tool_name
+                                content = search_result.content or "No content returned"
                                 st.write(f"**Results from {tool_name}:**")
                                 st.text_area(
                                     f"{tool_name} results", content, height=200,

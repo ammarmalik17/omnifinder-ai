@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from .query import QueryClassification
+from .result import ToolResponse
 
 
 class AgentResponse(BaseModel):
@@ -13,9 +14,9 @@ class AgentResponse(BaseModel):
     classification: Optional[QueryClassification] = Field(
         default=None, description="Query classification result"
     )
-    search_results: List[Dict[str, Any]] = Field(
+    search_results: List[ToolResponse] = Field(
         default_factory=list,
-        description="Raw search results from tools (tool_name + content dicts)",
+        description="Tool execution results",
     )
     synthesized_answer: str = Field(..., description="The final synthesized answer")
     conversational: bool = Field(

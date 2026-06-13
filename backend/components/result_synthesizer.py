@@ -1,9 +1,10 @@
 import asyncio
-from typing import Any, AsyncGenerator, Dict, List
+from typing import AsyncGenerator, List
 
 from langchain_core.language_models import BaseChatModel
 
 from backend.prompts import synthesis_prompt
+from backend.schemas.result import ToolResponse
 
 
 class ResultSynthesizer:
@@ -14,24 +15,19 @@ class ResultSynthesizer:
         self.chain = synthesis_prompt | self.llm
 
     @staticmethod
-    def _format_search_results(search_results: List[Dict[str, Any]]) -> str:
+    def _format_search_results(search_results: List[ToolResponse]) -> str:
         """Format search results into a single string for the LLM prompt.
 
         Shared between sync synthesize() and async stream_synthesize_async().
         """
         formatted_results = []
         for i, result in enumerate(search_results):
-            tool_name = result.get("tool_name", "Unknown Tool")
-            content = result.get("content", "")
-            # Ensure content is a string and handle potential None values
-            if content is None:
-                content = "No content returned from tool"
-            elif not isinstance(content, str):
-                content = str(content)
+            tool_name = result.tool_name
+            content = result.content or "No content returned from tool"
             formatted_results.append(f"Source {i+1} ({tool_name}):\n{content}\n---\n")
         return "\n".join(formatted_results)
 
-    def synthesize(self, query: str, search_results: List[Dict[str, Any]]) -> str:
+    def synthesize(self, query: str, search_results: List[ToolResponse]) -> str:
         """
         Synthesize search results into a coherent answer.
 
@@ -53,7 +49,7 @@ class ResultSynthesizer:
         return response.content
 
     async def stream_synthesize_async(
-        self, query: str, search_results: List[Dict[str, Any]]
+        self, query: str, search_results: List[ToolResponse]
     ) -> AsyncGenerator[str, None]:
         """
         Stream the synthesized answer using real LLM token streaming.
