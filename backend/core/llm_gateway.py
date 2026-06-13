@@ -152,7 +152,29 @@ class LLMGateway:
         all_models.extend(self._fetch_openrouter_models())
         all_models.extend(self._fetch_groq_models())
 
-        self._available_models = sorted(set(all_models))
+        # Exclude non-conventional models: guardrails, image gen, embeddings, audio/speech
+        exclude_patterns = [
+            # Guardrails / moderation
+            "prompt-guard",
+            "safeguard",
+            # Image generation
+            "flux",
+            "dall-e",
+            "stable-diffusion",
+            "sdxl",
+            # Embeddings
+            "text-embedding",
+            "ada",
+            # Audio transcription
+            "whisper",
+            # Text-to-speech / audio output
+            "tts",
+            "orpheus",
+        ]
+        self._available_models = sorted(
+            m for m in set(all_models)
+            if not any(p in m.lower() for p in exclude_patterns)
+        )
         return self._available_models
 
     # ------------------------------------------------------------------

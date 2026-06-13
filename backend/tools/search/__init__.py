@@ -4,6 +4,11 @@ from langchain_core.tools import BaseTool
 
 from backend.config.agent_config import AgentConfig
 
+from .arxiv import ArxivSearchTool
+from .web_search import WebSearchTool
+from .wikipedia import WikipediaSearchTool
+
+
 
 class BaseSearchTool(BaseTool):
     """Base class for all search tools, providing shared constructor logic.
@@ -19,10 +24,6 @@ class BaseSearchTool(BaseTool):
         if config is not None:
             self.config = config
 
-
-from .arxiv import ArxivSearchTool
-from .web_search import WebSearchTool
-from .wikipedia import WikipediaSearchTool
 
 
 def get_all_tools(config: Optional[AgentConfig] = None) -> List[BaseTool]:
