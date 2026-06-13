@@ -191,7 +191,7 @@ Your response should be informative, well-structured, and cite sources when poss
                             self.logger.info(f"▶️ Executing tool: {tool_name}")
                             tool = self.tools[tool_name]
                             try:
-                                tool_result = tool._run(**tool_args)
+                                tool_result = tool.invoke(tool_args)
                                 tool_exec_duration = time.time() - tool_exec_start
                                 self.logger.info(
                                     f"✅ Tool execution successful in {tool_exec_duration:.3f}s (result: {len(tool_result)} chars)"
@@ -379,7 +379,7 @@ Your response should be informative, well-structured, and cite sources when poss
                             if tool_name in self.tools:
                                 tool = self.tools[tool_name]
                                 try:
-                                    tool_result = tool._run(**tool_args)
+                                    tool_result = tool.invoke(tool_args)
                                     yield f"🔧 **Tool Result**: {tool_name} returned:\n```\n{tool_result[:200]}{'...' if len(tool_result) > 200 else ''}\n```\n\n"
                                     await asyncio.sleep(0.1)
                                 except Exception as e:

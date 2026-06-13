@@ -389,7 +389,7 @@ Your query: "{query}"'''
         else:
             raise ValueError(f"Tool '{tool_name}' not found")
 
-        return tool._run(query)
+        return tool.invoke(query)
 
     def _execute_single_tool_with_timing(self, tool_name: str, query: str) -> str:
         """
