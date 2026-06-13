@@ -15,10 +15,10 @@ OmniFinder AI is an intelligent search agent powered by LangChain and LLMs that 
 - **ReAct Agent Pattern**: Implements reasoning and acting loops for complex, multi-step queries
 - **Concurrent Execution**: Executes multiple searches in parallel for faster results
 - **Conversation Memory**: Maintains context across conversation history for coherent discussions
-- **Free LLM Models**: Uses free models via OpenRouter API (no OpenAI costs)
+- **Multi-Provider LLM**: Supports OpenRouter and Groq — pick from a unified model list
 - **Interactive UI**: Streamlit-based web interface with configurable settings
 - **Customizable Tools**: Enable/disable search tools on-the-fly
-- **Model Flexibility**: Switch between different free LLM models from OpenRouter
+- **Model Flexibility**: Switch between different LLM models from multiple providers
 
 ## 🎯 Use Cases
 
@@ -31,7 +31,7 @@ OmniFinder AI is an intelligent search agent powered by LangChain and LLMs that 
 ## 📋 Requirements
 
 - **Python**: 3.8 or higher
-- **OpenRouter API Key**: Free (for accessing free LLM models)
+- **OpenRouter API Key** or **Groq API Key**: At least one required for LLM access
 - **Internet Connection**: Required for search functionality
 - **Dependencies**: See [requirements.txt](requirements.txt)
 
@@ -72,20 +72,18 @@ Create a `.env` file in the project root directory:
 
 ```env
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
-To get a free OpenRouter API key:
+At least one API key is required:
 
-1. Visit [OpenRouter.ai](https://openrouter.ai)
-2. Sign up for a free account
-3. Navigate to the API Keys section
-4. Generate a new API key
-5. Copy it to your `.env` file
+- **OpenRouter**: Sign up at [OpenRouter.ai](https://openrouter.ai), navigate to API Keys, and generate a key.
+- **Groq**: Sign up at [Groq.com](https://console.groq.com), go to API Keys, and create a key.
 
 ### Step 5: Run the Application
 
 ```bash
-streamlit run frontend/app.py
+streamlit run app.py
 ```
 
 The application will open in your default web browser at `http://localhost:8501`
@@ -122,7 +120,7 @@ The application will open in your default web browser at `http://localhost:8501`
 
 #### LLM Model Selection
 
-- Browse available free models from OpenRouter
+- Browse available models from OpenRouter and Groq (merged into one list)
 - Switch models based on:
   - **Speed**: Smaller models are faster
   - **Quality**: Larger models provide better reasoning
@@ -130,7 +128,7 @@ The application will open in your default web browser at `http://localhost:8501`
 
 #### Max History Slider
 
-- **Values**: 1-50 messages
+- **Values**: 5-20 messages
 - **Impact**: Higher values increase context but consume more tokens
 - **Use Case**: Increase for complex, multi-turn conversations
 
@@ -152,58 +150,74 @@ graph TB
     StreamlitUI --> SidebarConfig[⚙️ Sidebar Configuration]
     StreamlitUI --> ChatInput[💬 Chat Input]
     
-    SidebarConfig --> ModelSelect[📋 LLM Model Selection]
+    SidebarConfig --> ModelSelect[📋 LLM Model<br/>OpenRouter + Groq]
     SidebarConfig --> MaxHistory[📊 Max History Slider]
-    SidebarConfig --> ToolToggles[🔧 Tool Toggles]
+    SidebarConfig --> ToolPills[🔧 Tool Pills]
     
-    ToolToggles --> Wikipedia[📚 Wikipedia]
-    ToolToggles --> ArXiv[📄 ArXiv]
-    ToolToggles --> WebSearch[🌐 Web Search]
-    ToolToggles --> ReActMode[🧠 ReAct Mode]
+    ToolPills --> Wikipedia[📖 Wikipedia]
+    ToolPills --> ArXiv[📄 ArXiv]
+    ToolPills --> WebSearch[🌐 Web Search]
+    ToolPills --> ReActMode[🧠 ReAct Mode]
     
     ChatInput --> SessionState[💾 Session State]
     SessionState --> Agent[🤖 Search Agent]
-    
-    ToolToggles --> EnabledTools[✅ Enabled Tools List]
-    ReActMode --> ReActFlag[🎯 Use ReAct Flag]
-    
-    EnabledTools --> Agent
-    ReActFlag --> Agent
+
+    subgraph Gateway[⚡ LLM Gateway]
+        direction TB
+        FetchModels[Fetch Models<br/>OpenRouter + Groq]
+        Benchmark[Benchmark Models<br/>Latency Test]
+        CreateLLM[Create LLM<br/>Auto-Provider Routing]
+    end
+
+    SidebarConfig --> Gateway
+    Gateway --> ModelSelect
+    Gateway -.-> Agent
 
     subgraph Agent[🤖 Search Agent]
         direction TB
         Classifier[🔍 Query Classifier<br/>Intent + Compound Detection]
-        Router{💡 Simple or Complex?}
-        Traditional[📡 Traditional Search<br/>Multi-tool Parallel]
-        ReAct[🧠 ReAct Agent<br/>PLAN → ACT → OBSERVE → DONE]
+        ConvCheck{💬 Conversational?}
+        ConvHandler[💬 Conversational Handler]
+        Router{📡 Simple or Complex?}
+        Traditional[📡 Traditional Search<br/>Multi-Tool Parallel]
+        ReAct[🧠 ReAct Agent<br/>PLAN → ACT → OBSERVE]
         Synthesizer[📝 Result Synthesizer<br/>LLM Synthesis]
-        StreamingOut[⚡ Real-time Token Streaming]
+        StreamingOut[⚡ Real Token Streaming]
 
-        Classifier --> Router
+        Classifier --> ConvCheck
+        ConvCheck -->|Yes| ConvHandler
+        ConvCheck -->|No| Router
         Router -->|Simple| Traditional
-        Router -->|Complex / Compound| ReAct
+        Router -->|Complex| ReAct
         Traditional --> Synthesizer
         ReAct --> Synthesizer
         Synthesizer --> StreamingOut
     end
 
+    subgraph Memory[💾 Conversation Memory]
+        MemAdd[Add Messages<br/>Thread-Safe]
+        MemTrim[Token-Aware Trim<br/>Sliding Window]
+    end
+
     Agent --> Output[📤 Final Answer]
-    EnabledTools -.-> Traditional
-    ReActFlag -.-> Router
+    Agent -.-> Memory
     Wikipedia -.-> Traditional
     Wikipedia -.-> ReAct
     ArXiv -.-> Traditional
     ArXiv -.-> ReAct
     WebSearch -.-> Traditional
     WebSearch -.-> ReAct
+    ReActMode -.-> Router
 ```
 
 ### Core Components
 
 - **SearchAgent**: Main orchestrator that coordinates all components
 - **QueryClassifier**: Uses LLM to classify queries and determine optimal tools
+- **ConversationalHandler**: Handles greetings, thanks, and small talk without search
 - **ResultSynthesizer**: Synthesizes results from multiple sources into coherent answers
 - **ReAct Agent**: Implements reasoning-acting loops for complex queries
+- **LLM Gateway**: Centralized LLM management (supports OpenRouter + Groq)
 - **ConversationMemory**: Maintains conversation history with token limits
 - **Search Tools**: Integrations with Wikipedia, ArXiv, and DuckDuckGo
 
@@ -216,7 +230,7 @@ Edit `backend/config/agent_config.py` to customize:
 ```python
 AgentConfig(
     # LLM Settings
-    model_name="openai/gpt-4-turbo",  # Default OpenRouter model
+    model_name="openai/gpt-5-nano",  # Default OpenRouter model
     temperature=0.1,                   # Lower = more deterministic
     
     # Execution Settings
@@ -247,7 +261,8 @@ Key dependencies used in this project:
 
 - **LangChain** (0.1.16+): LLM orchestration framework
 - **Streamlit** (1.31.1+): Web interface framework
-- **OpenRouter Client**: LLM API integration
+- **OpenRouter Client**: OpenRouter LLM API integration
+- **Groq Client**: Groq LLM API integration
 - **Wikipedia**: General knowledge search
 - **ArXiv**: Academic paper search
 - **DuckDuckGo Search (DDGS)**: Web search
@@ -271,7 +286,7 @@ Contributions are welcome! Here's how to get started:
 
 1. Follow PEP 8 style guidelines
 2. Add docstrings to functions and classes
-3. Test your changes locally with `streamlit run frontend/app.py`
+3. Test your changes locally with `streamlit run app.py`
 4. Ensure the application runs without errors
 
 ### Submitting Changes
@@ -297,15 +312,17 @@ Contributions are welcome! Here's how to get started:
 
 ### Common Issues
 
-**"Please set your OPENROUTER_API_KEY in the .env file"**
+**"No models available"**
 
-- Ensure your `.env` file exists in the project root
+- Ensure your `.env` file exists in the project root with at least one API key
+- OpenRouter: Sign up at [OpenRouter.ai](https://openrouter.ai)
+- Groq: Sign up at [Groq.com](https://console.groq.com)
 - Verify the API key format is correct
-- Check that environment variables are properly loaded
+- Check your internet connection
 
 **"Error fetching models"**
 
-- Verify your OpenRouter API key is valid
+- Verify your API keys are valid
 - Check internet connection
 - Try restarting the application
 
