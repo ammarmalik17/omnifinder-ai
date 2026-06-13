@@ -1,5 +1,4 @@
 import arxiv
-from langchain_core.tools import BaseTool
 
 from backend.config.agent_config import AgentConfig
 from backend.tools.search import BaseSearchTool
