@@ -1,8 +1,12 @@
 # 🔍 OmniFinder AI - Intelligent Search Agent
 
+<p align="center">
+
 [![Python Version](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Streamlit](https://img.shields.io/badge/Streamlit-latest-FF4B4B.svg)](https://streamlit.io/)
+
+</p>
 
 OmniFinder AI is an intelligent search agent powered by LangChain and LLMs that intelligently routes your queries to the most appropriate search tools. Instead of manually choosing between Wikipedia, academic papers, or web search, let the AI decide what works best for your question.
 
