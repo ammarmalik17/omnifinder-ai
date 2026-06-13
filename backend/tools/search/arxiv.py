@@ -1,7 +1,7 @@
 import arxiv
 
 from backend.config.agent_config import AgentConfig
-from backend.tools.search import BaseSearchTool
+from backend.tools.search.base import BaseSearchTool
 
 
 class ArxivSearchTool(BaseSearchTool):

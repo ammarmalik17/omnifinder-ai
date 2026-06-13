@@ -4,7 +4,7 @@ import wikipedia
 from bs4 import GuessedAtParserWarning
 
 from backend.config.agent_config import AgentConfig
-from backend.tools.search import BaseSearchTool
+from backend.tools.search.base import BaseSearchTool
 
 
 # Suppress the BeautifulSoup warning about parser guessing

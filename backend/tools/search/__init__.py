@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from langchain_core.tools import BaseTool
 
@@ -7,23 +7,6 @@ from backend.config.agent_config import AgentConfig
 from .arxiv import ArxivSearchTool
 from .web_search import WebSearchTool
 from .wikipedia import WikipediaSearchTool
-
-
-
-class BaseSearchTool(BaseTool):
-    """Base class for all search tools, providing shared constructor logic.
-
-    All search tools (Wikipedia, ArXiv, Web) share the same __init__ signature:
-    accepting an optional AgentConfig and forwarding kwargs to BaseTool.
-    """
-
-    config: AgentConfig = AgentConfig()
-
-    def __init__(self, config: Optional[AgentConfig] = None, **kwargs: Any):
-        super().__init__(**kwargs)
-        if config is not None:
-            self.config = config
-
 
 
 def get_all_tools(config: Optional[AgentConfig] = None) -> List[BaseTool]:
