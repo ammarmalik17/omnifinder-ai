@@ -5,7 +5,7 @@ Handles greetings, small talk, thanks, and other conversational intents
 without triggering unnecessary web searches.
 """
 
-from typing import Any, Dict
+from typing import Any, AsyncGenerator, Dict
 
 from langchain_core.language_models import BaseChatModel
 
@@ -20,7 +20,7 @@ class ConversationalHandler:
         self.chain = conversational_prompt | self.llm
 
     def handle(self, intent_type: str, query: str) -> Dict[str, Any]:
-        """Generate appropriate conversational response.
+        """Generate appropriate conversational response (synchronous, for memory storage).
 
         Args:
             intent_type: Type of conversational intent (greeting, small_talk, thanks, farewell, help_request)
@@ -43,6 +43,28 @@ class ConversationalHandler:
             "requires_no_search": True,
             "metadata": {"conversational": True, "intent_type": intent_type},
         }
+
+    async def astream_response(
+        self, intent_type: str, query: str
+    ) -> AsyncGenerator[str, None]:
+        """Stream a conversational response using real LLM token streaming.
+
+        Uses chain.astream() to yield actual tokens as the LLM generates them,
+        instead of faking it by chunking a pre-generated response.
+
+        Args:
+            intent_type: Type of conversational intent (not used directly, but available for future customization)
+            query: The user's original message
+
+        Yields:
+            Real LLM token chunks as they arrive from the API
+        """
+        try:
+            async for chunk in self.chain.astream({"message": query}):
+                if chunk.content:
+                    yield chunk.content
+        except Exception as e:
+            yield f"Error generating response: {str(e)}"
 
 
 def get_conversational_response_templates() -> Dict[str, str]:

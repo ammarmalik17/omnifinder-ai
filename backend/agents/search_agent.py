@@ -482,13 +482,12 @@ Your query: "{query}"'''
             Chunks of the synthesized answer as they become available
         """
         try:
-            # For conversational responses, stream directly (pre-generated text)
+            # For conversational responses, use real LLM token streaming
             if result.conversational:
-                response = result.synthesized_answer
-                for i in range(0, len(response), 3):
-                    chunk = response[i : i + 3]
+                async for chunk in self.conversational_handler.astream_response(
+                    result.intent_handled, query
+                ):
                     yield chunk
-                    await asyncio.sleep(0.01)
                 return
 
             # For search results, stream from the synthesizer's real LLM streaming
