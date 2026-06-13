@@ -77,10 +77,17 @@ with st.sidebar:
             st.session_state.benchmarked_models = gateway.benchmark_models(force=force)
     benchmarked = st.session_state.get("benchmarked_models", [])
 
+    def _display_name(m: str) -> str:
+        """Strip provider prefix and :free suffix for cleaner display."""
+        name = m.split("/", 1)[-1]
+        if name.endswith(":free"):
+            name = name[:-5]
+        return name
+
     if benchmarked:
-        # Build display labels with latency info
+        # Build display labels with latency info, strip provider prefix and :free
         model_labels = {
-            m: f"{m}  ⚡{l:.1f}s" for m, l in benchmarked
+            m: f"{_display_name(m)}  ⚡{l:.1f}s" for m, l in benchmarked
         }
         default_index = 0
         no_models_available = False
@@ -94,7 +101,7 @@ with st.sidebar:
         # Fallback: show all available models (unbenchmarked) if benchmark returned nothing
         fallback_models = gateway.get_available_models()
         if fallback_models:
-            model_labels = {m: m for m in fallback_models}
+            model_labels = {m: _display_name(m) for m in fallback_models}
             default_index = 0
             no_models_available = False
             st.caption("⚠️ Benchmark returned no results. Showing all available models unfiltered.")
@@ -109,7 +116,7 @@ with st.sidebar:
         model_option = st.selectbox(
             "Select LLM Model",
             options=model_ids,
-            format_func=lambda m: model_labels.get(m, m),
+            format_func=lambda m: model_labels.get(m, _display_name(m)),
             index=default_index if model_ids else None,
         )
 
