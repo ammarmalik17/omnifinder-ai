@@ -47,8 +47,8 @@ if "agent" not in st.session_state:
             max_history_messages=max_history,
         )
         st.session_state.agent = SearchAgent(llm, config=agent_config)
-        # Track the current model for dynamic switching
-        st.session_state.current_model = llm.model_name
+        # Track the current model for dynamic switching (use gateway for provider-agnostic ID)
+        st.session_state.current_model = get_llm_gateway().get_default_model()
     except ValueError as e:
         st.error(f"LLM initialization error: {str(e)}")
         st.stop()
@@ -87,7 +87,7 @@ with st.sidebar:
         model_labels = {}
         default_index = None
         no_models_available = True
-        st.warning("Daily quota exhausted. The system is still smart, just financially grounded.")
+        st.warning("Daily quota may be exhausted, or no models returned. The system is still smart, just financially grounded.")
     else:
         # Fallback: show all available models (unbenchmarked) if benchmark returned nothing
         fallback_models = gateway.get_available_models()
@@ -100,7 +100,7 @@ with st.sidebar:
             model_labels = {}
             default_index = None
             no_models_available = True
-            st.warning("No models available. Check your OpenRouter API key.")
+            st.warning("No models available. Check your API keys (OPENROUTER_API_KEY and/or GROQ_API_KEY).")
 
     model_ids = list(model_labels.keys())
     if not no_models_available:
@@ -267,6 +267,7 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
                                             f"{step['tool']} result",
                                             step["result"],
                                             height=150,
+                                            key=f"react_tool_{step['step']}_{step['tool']}",
                                         )
                             elif step["action"] == "final_response":
                                 with st.container():
@@ -289,7 +290,7 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
                     # Show search results only if there are results
                     if search_results:
                         with st.expander("📊 Search Results", expanded=True):
-                            for search_result in search_results:
+                            for i, search_result in enumerate(search_results):
                                 tool_name = search_result.get(
                                     "tool_name", "Unknown Tool"
                                 )
@@ -298,7 +299,8 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
                                 )
                                 st.write(f"**Results from {tool_name}:**")
                                 st.text_area(
-                                    f"{tool_name} results", content, height=200
+                                    f"{tool_name} results", content, height=200,
+                                    key=f"{tool_name}_{i}"
                                 )
 
                 # Stream the synthesized answer progressively using true streaming

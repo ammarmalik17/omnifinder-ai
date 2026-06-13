@@ -8,13 +8,13 @@ without triggering unnecessary web searches.
 from typing import Any, Dict
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openrouter import ChatOpenRouter
+from langchain_core.language_models import BaseChatModel
 
 
 class ConversationalHandler:
     """Handles conversational intents with appropriate responses."""
 
-    def __init__(self, llm: ChatOpenRouter):
+    def __init__(self, llm: BaseChatModel):
         self.llm = llm
         self.prompt = ChatPromptTemplate.from_messages(
             [

@@ -4,8 +4,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, AsyncGenerator, Dict, List
 
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage
-from langchain_openrouter import ChatOpenRouter
 
 from backend.components.conversational_handler import ConversationalHandler
 from backend.components.query_classifier import QueryClassifier
@@ -20,7 +20,7 @@ from backend.utils.logger import AgentLogger
 class SearchAgent:
     """Main search agent that integrates all components."""
 
-    def __init__(self, llm: ChatOpenRouter, config: AgentConfig = None):
+    def __init__(self, llm: BaseChatModel, config: AgentConfig = None):
         self.config = config or AgentConfig()
         self.llm = llm
         self.max_workers = self.config.max_workers
@@ -128,7 +128,7 @@ class SearchAgent:
                 self.logger.info(
                     f"Using ReAct pattern for complex query: {query[:50]}..."
                 )
-                return self._process_with_react(query)
+                return self._process_with_react(query, classification)
 
             # STEP 5: Traditional search routing
             self.logger.log_step("Traditional search routing")
@@ -283,6 +283,10 @@ Your query: "{query}"'''
         Returns:
             True if the query should use ReAct reasoning, False otherwise
         """
+        # Compound queries (multiple sub-questions) always go to ReAct
+        if hasattr(classification, "is_compound") and classification.is_compound:
+            return True
+
         # Consider a query complex if it:
         # - Contains multiple sub-questions
         # - Requires synthesis of information from multiple sources
@@ -298,17 +302,22 @@ Your query: "{query}"'''
 
         return False
 
-    def _process_with_react(self, query: str) -> Dict[str, Any]:
+    def _process_with_react(self, query: str, classification=None) -> Dict[str, Any]:
         """
         Process a query using the ReAct agent for complex reasoning.
 
         Args:
             query: The user's query
+            classification: Optional classification result (for sub_queries)
 
         Returns:
             Dictionary containing the response from the ReAct agent
         """
-        react_result = self.react_agent.process_query(query)
+        sub_queries = None
+        if classification and hasattr(classification, "is_compound") and classification.is_compound:
+            sub_queries = classification.sub_queries
+
+        react_result = self.react_agent.process_query(query, sub_queries=sub_queries)
 
         # Format the result to match the expected return format
         return {
@@ -451,7 +460,10 @@ Your query: "{query}"'''
         self, query: str, result: Dict[str, Any]
     ) -> AsyncGenerator[str, None]:
         """
-        Stream the synthesized answer using true LLM streaming.
+        Stream the synthesized answer using real LLM token streaming.
+
+        For search results, uses model.astream() to yield actual tokens as the LLM
+        generates them. For conversational responses, chunks the pre-generated text.
 
         Args:
             query: The user's query
@@ -461,60 +473,27 @@ Your query: "{query}"'''
             Chunks of the synthesized answer as they become available
         """
         try:
-            # For conversational responses, stream directly
+            # For conversational responses, stream directly (pre-generated text)
             if result.get("conversational"):
                 response = result["synthesized_answer"]
-                # Stream character by character for smooth typing effect
                 for i in range(0, len(response), 3):
                     chunk = response[i : i + 3]
                     yield chunk
-                    await asyncio.sleep(0.01)  # Small delay for smooth streaming
+                    await asyncio.sleep(0.01)
                 return
 
-            # For search results, we need to stream the synthesis process
+            # For search results, stream from the synthesizer's real LLM streaming
             search_results = result.get("search_results", [])
             if not search_results:
                 yield result.get("synthesized_answer", "")
                 return
 
-            # Stream the synthesis process step by step
+            # Stream initial banner, then delegate to real LLM token streaming
             yield "🔍 Analyzing search results...\n\n"
-            await asyncio.sleep(0.1)
-
-            # Stream each search result with attribution
-            for search_result in search_results:
-                tool_name = search_result.get("tool_name", "Unknown Tool")
-                content = search_result.get("content", "")
-
-                yield f"📚 Processing results from **{tool_name}**...\n\n"
-                await asyncio.sleep(0.1)
-
-                # Stream the content in chunks
-                if content and len(content) > 100:
-                    # For long content, summarize first
-                    yield f"📋 Key findings from {tool_name}:\n"
-                    summary = content[:200] + "..." if len(content) > 200 else content
-                    for j in range(0, len(summary), 10):
-                        chunk = summary[j : j + 10]
-                        yield chunk
-                        await asyncio.sleep(0.02)
-                    yield "\n\n"
-                else:
-                    # For short content, show it directly
-                    yield f"📝 {content}\n\n"
-                    await asyncio.sleep(0.1)
-
-            # Stream the final synthesis
-            yield "✨ Synthesizing comprehensive answer...\n\n"
-            await asyncio.sleep(0.2)
-
-            # Stream the final answer
-            final_answer = result.get("synthesized_answer", "")
-            if final_answer:
-                for k in range(0, len(final_answer), 5):
-                    chunk = final_answer[k : k + 5]
-                    yield chunk
-                    await asyncio.sleep(0.015)
+            async for chunk in self.result_synthesizer.stream_synthesize_async(
+                query, search_results
+            ):
+                yield chunk
 
         except Exception as e:
             yield f"❌ Error during streaming: {str(e)}"

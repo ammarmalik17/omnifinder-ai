@@ -12,7 +12,7 @@ from langchain_core.messages import (
     trim_messages,
 )
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openrouter import ChatOpenRouter
+from langchain_core.language_models import BaseChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class ConversationBufferWindowMemory:
 
     def __init__(
         self,
-        llm: ChatOpenRouter,
+        llm: BaseChatModel,
         max_token_limit: int = 3000,
         max_history_messages: int = 10,
     ):
@@ -169,7 +169,7 @@ class ConversationSummaryMemory:
 
     def __init__(
         self,
-        llm: ChatOpenRouter,
+        llm: BaseChatModel,
         max_token_limit: int = 3000,
         max_summary_tokens: int = 500,
     ):

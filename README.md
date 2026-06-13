@@ -169,6 +169,33 @@ graph TB
     
     EnabledTools --> Agent
     ReActFlag --> Agent
+
+    subgraph Agent[🤖 Search Agent]
+        direction TB
+        Classifier[🔍 Query Classifier<br/>Intent + Compound Detection]
+        Router{💡 Simple or Complex?}
+        Traditional[📡 Traditional Search<br/>Multi-tool Parallel]
+        ReAct[🧠 ReAct Agent<br/>PLAN → ACT → OBSERVE → DONE]
+        Synthesizer[📝 Result Synthesizer<br/>LLM Synthesis]
+        StreamingOut[⚡ Real-time Token Streaming]
+
+        Classifier --> Router
+        Router -->|Simple| Traditional
+        Router -->|Complex / Compound| ReAct
+        Traditional --> Synthesizer
+        ReAct --> Synthesizer
+        Synthesizer --> StreamingOut
+    end
+
+    Agent --> Output[📤 Final Answer]
+    EnabledTools -.-> Traditional
+    ReActFlag -.-> Router
+    Wikipedia -.-> Traditional
+    Wikipedia -.-> ReAct
+    ArXiv -.-> Traditional
+    ArXiv -.-> ReAct
+    WebSearch -.-> Traditional
+    WebSearch -.-> ReAct
 ```
 
 ### Core Components
