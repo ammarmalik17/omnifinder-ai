@@ -1,6 +1,3 @@
-import asyncio
-import time
-
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -54,11 +51,16 @@ if "agent" not in st.session_state:
         st.stop()
 
 # Sidebar for configuration
+# Cache the LLM Gateway as a singleton to avoid re-initialization on every rerun
+@st.cache_resource
+def get_cached_gateway():
+    return get_llm_gateway()
+
 with st.sidebar:
     st.header("Configuration")
 
-    # Get models from the LLM Gateway — benchmarked (responsive + sorted by latency)
-    gateway = get_llm_gateway()
+    # Get cached LLM Gateway singleton
+    gateway = get_cached_gateway()
 
     # Benchmark/refresh button
     col1, col2 = st.columns([3, 1])
@@ -68,12 +70,12 @@ with st.sidebar:
         if st.button("🔄", help="Re-benchmark models", use_container_width=True):
             st.session_state.benchmark_force = True
 
-    # Run benchmark (cached internally; force refresh on button click)
+    # Run benchmark only on first load or when refresh button is clicked
     force = st.session_state.pop("benchmark_force", False)
-    benchmark_start = time.time()
-    with st.spinner("Fetching Models..."):
-        benchmarked = gateway.benchmark_models(force=force)
-    benchmark_elapsed = time.time() - benchmark_start
+    if force or "benchmarked_models" not in st.session_state:
+        with st.spinner("Fetching Models..."):
+            st.session_state.benchmarked_models = gateway.benchmark_models(force=force)
+    benchmarked = st.session_state.get("benchmarked_models", [])
 
     if benchmarked:
         # Build display labels with latency info
@@ -130,7 +132,7 @@ with st.sidebar:
                 st.session_state.current_model = model_option
 
                 # Show success message
-                st.success(f"Model switched to: {model_option}")
+                st.toast(f"Switched to {model_option}", icon="✅")
 
             except Exception as e:
                 st.error(f"Error switching model: {str(e)}")
@@ -140,51 +142,42 @@ with st.sidebar:
 
         st.divider()
 
-        # Tool and capability toggles in sidebar
+        # Tool and capability selection using pills
         st.subheader("🔧 Tools & Capabilities")
-        use_wikipedia = st.toggle(
-            "📚 Wikipedia", value=True, help="Search Wikipedia for general knowledge"
-        )
-        use_arxiv = st.toggle(
-            "📄 ArXiv", value=True, help="Search academic papers on ArXiv"
-        )
-        use_web_search = st.toggle(
-            "🌐 Web Search",
-            value=True,
-            help="Search web for current events and general queries",
-        )
-        use_react = st.toggle(
-            "🧠 ReAct Mode",
-            value=True,
-            help="Enable advanced reasoning for complex queries",
+        tool_options = ["📖 Wikipedia", "📄 ArXiv", "🌐 Search", "🧠 ReAct"]
+        selected_pills = st.pills(
+            "Select tools to enable",
+            options=tool_options,
+            selection_mode="multi",
+            default=tool_options,
+            help="Choose which tools to use for search queries",
         )
 
-        # Store enabled tools in session state
+        # Map selected pills to internal names
+        tool_name_map = {
+            "📖 Wikipedia": "wikipedia",
+            "📄 ArXiv": "arxiv",
+            "🌐 Search": "web_search",
+            "🧠 ReAct": "react",
+        }
+
         st.session_state.enabled_tools = []
-        if use_wikipedia:
-            st.session_state.enabled_tools.append("wikipedia")
-        if use_arxiv:
-            st.session_state.enabled_tools.append("arxiv")
-        if use_web_search:
-            st.session_state.enabled_tools.append("web_search")
-
-        st.session_state.use_react_mode = use_react
-
-        # Visual indicator of active tools in sidebar
-        if st.session_state.enabled_tools:
-            active_tools_str = " • ".join(
-                [t.replace("_", " ").title() for t in st.session_state.enabled_tools]
-            )
-            if st.session_state.use_react_mode:
-                active_tools_str += " • 🧠 ReAct"
-            st.caption(f"Active: {active_tools_str}")
+        st.session_state.use_react_mode = False
+        for pill in selected_pills:
+            internal_name = tool_name_map[pill]
+            if internal_name == "react":
+                st.session_state.use_react_mode = True
+            else:
+                st.session_state.enabled_tools.append(internal_name)
 
         st.divider()
 
-        if st.button("Clear Chat History"):
+        def clear_chat():
             st.session_state.messages = []
             st.session_state.agent.clear_conversation()
-            st.rerun()
+            st.toast("Chat history cleared", icon="🗑️")
+
+        st.button("Clear Chat History", on_click=clear_chat)
 
 # Get the agent from session state
 agent = st.session_state.agent
@@ -305,11 +298,6 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
 
                 # Stream the synthesized answer progressively using true streaming
                 with st.expander("✨ Synthesized Answer", expanded=True):
-                    # Use true streaming with cancellation support
-                    stop_button = st.button(
-                        "⏹️ Stop Streaming", key=f"stop_{len(st.session_state.messages)}"
-                    )
-
                     # Create a generator that yields tokens as they arrive
                     async def stream_answer():
                         try:
@@ -321,11 +309,9 @@ if prompt := st.chat_input("Ask me anything...", disabled=no_models_available):
                         except Exception as e:
                             yield f"Error during streaming: {str(e)}"
 
-                    # Stream the response with cancellation support
+                    # Stream the response
                     try:
                         st.write_stream(stream_answer())
-                    except asyncio.CancelledError:
-                        st.info("Streaming cancelled by user")
                     except Exception as e:
                         st.error(f"Streaming error: {str(e)}")
 
